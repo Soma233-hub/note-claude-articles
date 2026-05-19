@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudeへの「聞き方」比較デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+    color: #fff;
+  }
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-align: center;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    font-size: 0.9rem;
+    color: #a0aec0;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .comparison {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    max-width: 1100px;
+    margin-bottom: 28px;
+  }
+  .card {
+    flex: 1;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(12px);
+    transition: transform 0.2s;
+  }
+  .card:hover { transform: translateY(-3px); }
+  .card.bad { border-color: rgba(248,113,113,0.4); }
+  .card.good { border-color: rgba(74,222,128,0.4); }
+  .card-label {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .bad .card-label { background: rgba(248,113,113,0.2); color: #f87171; }
+  .good .card-label { background: rgba(74,222,128,0.2); color: #4ade80; }
+  .prompt-box {
+    background: rgba(0,0,0,0.35);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    margin-bottom: 14px;
+    font-family: 'Courier New', monospace;
+    color: #e2e8f0;
+    min-height: 70px;
+  }
+  .arrow {
+    text-align: center;
+    font-size: 1.4rem;
+    margin: 8px 0;
+    color: #94a3b8;
+  }
+  .response-box {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.86rem;
+    line-height: 1.75;
+    color: #cbd5e1;
+    min-height: 120px;
+  }
+  .response-box.bad-resp { border-left: 3px solid #f87171; }
+  .response-box.good-resp { border-left: 3px solid #4ade80; }
+  .score-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .score-chip {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: #94a3b8;
+  }
+  .score-chip span { font-weight: 700; }
+  .bad .score-chip span { color: #f87171; }
+  .good .score-chip span { color: #4ade80; }
+  .tips-section {
+    width: 100%;
+    max-width: 1100px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 24px 28px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .tips-section h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #a78bfa;
+  }
+  .tips-grid {
+    display: flex;
+    gap: 16px;
+  }
+  .tip {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .tip-num {
+    font-size: 1.8rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .tip-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+  }
+  .tip-desc {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    line-height: 1.6;
+  }
+  .selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .sel-btn {
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.06);
+    color: #e2e8f0;
+    font-size: 0.84rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sel-btn.active, .sel-btn:hover {
+    background: rgba(167,139,250,0.25);
+    border-color: #a78bfa;
+    color: #a78bfa;
+  }
+</style>
+</head>
+<body>
+<h1>Claudeへの「聞き方」比較デモ</h1>
+<p class="subtitle">同じ用件でも、伝え方次第でAIの回答品質は大きく変わる</p>
+
+<div class="selector">
+  <button class="sel-btn active" onclick="showExample(0, this)">メール作成</button>
+  <button class="sel-btn" onclick="showExample(1, this)">議事録まとめ</button>
+  <button class="sel-btn" onclick="showExample(2, this)">ブログ下書き</button>
+</div>
+
+<div class="comparison" id="comparison">
+  <!-- JS で動的生成 -->
+</div>
+
+<div class="tips-section">
+  <h2>✦ 良い質問の3原則</h2>
+  <div class="tips-grid">
+    <div class="tip">
+      <div class="tip-num">01</div>
+      <div class="tip-title">役割を与える</div>
+      <div class="tip-desc">「あなたは〇〇の専門家です」と宣言するだけで出力の質・トーンが変わる</div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">02</div>
+      <div class="tip-title">背景・目的を伝える</div>
+      <div class="tip-desc">なぜ作るか・誰が読むかを伝えると、的外れな回答を防ぎ精度が上がる</div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">03</div>
+      <div class="tip-title">形式を指定する</div>
+      <div class="tip-desc">「箇条書き」「300字以内」「例を2つ」など出力形式を明示すると即使える回答が返る</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const examples = [
+  {
+    title: "メール作成",
+    bad: {
+      prompt: "取引先へのお断りメールを書いて",
+      response: "件名：ご提案について\n\nお世話になっております。\nこの度のご提案について、ご辞退させていただきたいと思います。\nご理解のほどよろしくお願いいたします。",
+      scores: { 精度: "△", 即使用: "×", 長さ: "短すぎ" }
+    },
+    good: {
+      prompt: "あなたは営業部のベテランマネージャーです。IT企業への提案を丁重にお断りするメールを書いてください。理由：予算都合。トーン：誠実・前向き。150字以内で結びに「今後の機会」へ言及してください。",
+      response: "件名：ご提案の件について\n\nいつもお世話になっております。\nこの度は貴重なご提案をいただき、誠にありがとうございます。\n社内検討を重ねた結果、今期は予算の都合により見送らせていただくこととなりました。\n貴社のご提案内容は大変魅力的であり、来期以降の機会に改めてご相談できれば幸いです。\n引き続きどうぞよろしくお願いいたします。",
+      scores: { 精度: "◎", 即使用: "○", 長さ: "適切" }
+    }
+  },
+  {
+    title: "議事録まとめ",
+    bad: {
+      prompt: "議事録をまとめて",
+      response: "（何をまとめればよいか不明なため、内容を提供してください、という返答になるか、汎用的な定型文のみが出力されます）",
+      scores: { 精度: "×", 即使用: "×", 長さ: "空回り" }
+    },
+    good: {
+      prompt: "以下の会議メモを議事録に整えてください。\n形式：①決定事項 ②TODO（担当・期限付き）③懸念事項\n箇条書き・3〜5行で完結させてください。\n---\n（会議メモをここに貼り付け）",
+      response: "【決定事項】\n・新機能リリース日を6/1に確定\n・デザインはAパターンで進行\n\n【TODO】\n・山田：テスト仕様書作成（5/25まで）\n・佐藤：デザイン最終確認（5/22まで）\n\n【懸念事項】\n・ローンチ後のサーバー負荷対策が未定",
+      scores: { 精度: "◎", 即使用: "◎", 長さ: "適切" }
+    }
+  },
+  {
+    title: "ブログ下書き",
+    bad: {
+      prompt: "AIについてブログを書いて",
+      response: "AI（人工知能）は現代社会において非常に重要な技術です。AIは様々な分野で活用されており、私たちの生活を豊かにしています…（一般論が続く）",
+      scores: { 精度: "△", 即使用: "×", 長さ: "冗長" }
+    },
+    good: {
+      prompt: "あなたはテックライターです。「Claude初心者が最初にやるべきこと3選」というブログ記事の導入文を書いてください。\n・想定読者：AI未経験の会社員\n・トーン：親しみやすい・背中を押すような\n・文字数：150字前後\n・冒頭は「実は、」で始める",
+      response: "実は、Claudeを使い始めて最初にやることを間違えると、「AIって大したことないな」と感じて終わりになりがちです。でも、たった3つのコツを知るだけで、毎日の仕事が驚くほどラクになります。今日からすぐ試せる方法を紹介します。",
+      scores: { 精度: "◎", 即使用: "◎", 長さ: "適切" }
+    }
+  }
+];
+
+function showExample(idx, btn) {
+  document.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const e = examples[idx];
+  const container = document.getElementById('comparison');
+  container.innerHTML = `
+    <div class="card bad">
+      <span class="card-label">NG プロンプト</span>
+      <div class="prompt-box">${e.bad.prompt}</div>
+      <div class="arrow">↓ Claudeの返答</div>
+      <div class="response-box bad-resp" style="white-space:pre-line">${e.bad.response}</div>
+      <div class="score-row">
+        ${Object.entries(e.bad.scores).map(([k,v]) => `<span class="score-chip">${k}：<span>${v}</span></span>`).join('')}
+      </div>
+    </div>
+    <div class="card good">
+      <span class="card-label">OK プロンプト</span>
+      <div class="prompt-box">${e.good.prompt}</div>
+      <div class="arrow">↓ Claudeの返答</div>
+      <div class="response-box good-resp" style="white-space:pre-line">${e.good.response}</div>
+      <div class="score-row">
+        ${Object.entries(e.good.scores).map(([k,v]) => `<span class="score-chip">${k}：<span>${v}</span></span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+showExample(0, document.querySelector('.sel-btn.active'));
+</script>
+</body>
+</html>
