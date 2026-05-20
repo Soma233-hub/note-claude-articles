@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プロンプトエンジニアリング テクニック比較デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+  .header p { color: #94a3b8; font-size: 0.9rem; }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 1140px;
+    margin-bottom: 28px;
+  }
+
+  .panel {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #334155;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+  }
+  .badge-before { background: #dc2626; color: #fff; }
+  .badge-after  { background: #16a34a; color: #fff; }
+  .panel-title { font-size: 1rem; font-weight: 600; color: #cbd5e1; }
+
+  .technique-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+    justify-content: center;
+  }
+  .tech-btn {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.2s;
+  }
+  .tech-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+  .tech-btn.active {
+    background: #1d4ed8;
+    border-color: #3b82f6;
+    color: #fff;
+  }
+
+  .prompt-box {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    color: #e2e8f0;
+    min-height: 120px;
+    margin-bottom: 12px;
+  }
+  .output-box {
+    background: #0f172a;
+    border: 1px solid #1e40af;
+    border-left: 3px solid #3b82f6;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.83rem;
+    line-height: 1.7;
+    color: #bfdbfe;
+    min-height: 80px;
+    white-space: pre-wrap;
+  }
+  .output-label {
+    font-size: 0.72rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+
+  .score-bar-container {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .score-label { font-size: 0.78rem; color: #94a3b8; min-width: 60px; }
+  .score-track {
+    flex: 1;
+    background: #334155;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .score-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+  .score-fill.before { background: #ef4444; }
+  .score-fill.after  { background: #22c55e; }
+  .score-num { font-size: 0.82rem; font-weight: 700; min-width: 40px; text-align: right; }
+
+  .tip-box {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 18px 24px;
+    width: 100%;
+    max-width: 1140px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .tip-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+  .tip-content h3 { font-size: 0.95rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px; }
+  .tip-content p { font-size: 0.85rem; color: #94a3b8; line-height: 1.6; }
+
+  .divider { color: #475569; font-size: 0.8rem; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>プロンプトエンジニアリング テクニック比較デモ</h1>
+  <p>テクニックを選択して、Before / After の出力品質の差を体感してください</p>
+</div>
+
+<div class="technique-selector" id="techSelector"></div>
+
+<div class="container">
+  <div class="panel" id="beforePanel">
+    <div class="panel-header">
+      <span class="badge badge-before">BEFORE</span>
+      <span class="panel-title">改善前のプロンプト</span>
+    </div>
+    <div class="prompt-box" id="beforePrompt"></div>
+    <div class="output-label">AI の出力イメージ</div>
+    <div class="output-box" id="beforeOutput"></div>
+    <div class="score-bar-container">
+      <span class="score-label">出力品質</span>
+      <div class="score-track"><div class="score-fill before" id="beforeBar"></div></div>
+      <span class="score-num" id="beforeScore"></span>
+    </div>
+  </div>
+
+  <div class="panel" id="afterPanel">
+    <div class="panel-header">
+      <span class="badge badge-after">AFTER</span>
+      <span class="panel-title">テクニック適用後</span>
+    </div>
+    <div class="prompt-box" id="afterPrompt"></div>
+    <div class="output-label">AI の出力イメージ</div>
+    <div class="output-box" id="afterOutput"></div>
+    <div class="score-bar-container">
+      <span class="score-label">出力品質</span>
+      <div class="score-track"><div class="score-fill after" id="afterBar"></div></div>
+      <span class="score-num" id="afterScore"></span>
+    </div>
+  </div>
+</div>
+
+<div class="tip-box" id="tipBox">
+  <div class="tip-icon">💡</div>
+  <div class="tip-content">
+    <h3 id="tipTitle"></h3>
+    <p id="tipDesc"></p>
+  </div>
+</div>
+
+<script>
+const techniques = [
+  {
+    id: "cot",
+    label: "①Chain-of-Thought",
+    before: `このメールは良いですか？\n\n「お世話になっております。先日の件ですが、\nご確認いただけましたでしょうか。」`,
+    after: `以下のビジネスメールを評価してください。\n\nステップ1: 件名・宛先の明確さを確認する\nステップ2: 要件の具体性を評価する\nステップ3: 礼儀・丁寧さを採点する\nステップ4: 改善案を3つ提案する\n\nメール：「お世話になっております。先日の件ですが、\nご確認いただけましたでしょうか。」`,
+    beforeOut: "普通のメールだと思います。丁寧な表現が使われています。",
+    afterOut: "【評価結果】\nStep1: 件名なし・宛先不明 → 要改善\nStep2: 「先日の件」が曖昧で要件不明確\nStep3: 敬語は適切（7/10）\n\n【改善案】\n① 件名を「〇〇プロジェクト進捗確認のお願い」に明記\n② 「先日の件」→「5/18にお送りした提案書」と具体化\n③ 期限を明示：「5/22（金）までにご回答いただけますと幸いです」",
+    beforeScore: 28,
+    afterScore: 88,
+    tip: "Chain-of-Thought（思考連鎖）",
+    tipDesc: "「ステップN:」と明示することでAIに段階的な推論を促す。複雑な評価・分析タスクで精度が大幅に向上する。"
+  },
+  {
+    id: "persona",
+    label: "②ペルソナ設定",
+    before: `Pythonのコードレビューをしてください。\n\n\`\`\`python\nfor i in range(len(items)):\n    print(items[i])\n\`\`\``,
+    after: `あなたはGoogle SREチームの経験15年のシニアエンジニアです。\nコードの品質・可読性・Pythonicな書き方の観点から\n厳格にレビューし、改善版コードも提示してください。\n\n\`\`\`python\nfor i in range(len(items)):\n    print(items[i])\n\`\`\``,
+    beforeOut: "コードは動作しています。ループでリストを出力しています。特に問題はないと思います。",
+    afterOut: "【SREレビュー】重大度: MINOR\n\n❌ Non-Pythonicパターン検出\n`range(len())` はアンチパターンです。\n\n✅ 推奨コード:\n```python\nfor item in items:\n    print(item)\n```\n\n理由: イテラブルを直接ループすることでインデックス誤りを防ぎ、可読性が向上。大規模データでのメモリ効率も改善されます。",
+    beforeScore: 25,
+    afterScore: 92,
+    tip: "ペルソナ設定",
+    tipDesc: "役職・経験年数・所属組織を明示することで、AIの「視点」と「基準」が定まる。専門的なレビューや分析タスクで特に効果的。"
+  },
+  {
+    id: "output-format",
+    label: "③出力フォーマット指定",
+    before: `AIの活用メリットを教えてください。`,
+    after: `AIの業務活用メリットを以下のフォーマットで回答してください。\n\n出力形式:\n| メリット | 具体例 | 削減時間の目安 |\n|---------|--------|---------------|\n（3行で出力）\n\n対象: 中小企業の管理部門`,
+    beforeOut: "AIにはたくさんのメリットがあります。まず時間の節約ができます。次に品質が向上します。また、コスト削減も期待できます。さらに...",
+    afterOut: "| メリット | 具体例 | 削減時間の目安 |\n|----------|--------|---------------|\n| 文書作成の自動化 | 議事録・報告書の下書き生成 | 月40〜60時間 |\n| データ集計・分析 | ExcelデータのAI解析・グラフ化 | 月15〜25時間 |\n| メール対応効率化 | 定型返信文の自動生成 | 月10〜20時間 |",
+    beforeScore: 20,
+    afterScore: 95,
+    tip: "出力フォーマット指定",
+    tipDesc: "表・JSON・箇条書きなど出力形式を明示すると、そのまま使える成果物が得られる。「対象読者」を指定すると内容の精度も上がる。"
+  },
+  {
+    id: "constraint",
+    label: "④制約条件の明示",
+    before: `新商品のキャッチコピーを作ってください。\n商品: 睡眠改善サプリメント`,
+    after: `新商品のキャッチコピーを5案作成してください。\n\n制約条件:\n- 文字数: 15〜20文字\n- トーン: 科学的・信頼感\n- 禁止ワード: 「革命」「奇跡」「絶対」\n- ターゲット: 30〜50代のビジネスパーソン\n- 差別化点: 天然由来成分100%\n\n商品: 睡眠改善サプリメント`,
+    beforeOut: "①眠れない夜よ、さようなら！\n②革命的な睡眠体験\n③絶対に効く！魔法の眠り\n④ぐっすり眠れる奇跡のサプリ",
+    afterOut: "①「科学が証明した、深い眠りへ」（15文字）\n②「天然成分で、本来の睡眠を取り戻す」（18文字）\n③「データが支持する、質の高い休息」（16文字）\n④「忙しいあなたの眠りを、自然に整える」（18文字）\n⑤「臨床試験済み。朝の目覚めが変わる」（17文字）",
+    beforeScore: 22,
+    afterScore: 90,
+    tip: "制約条件の明示",
+    tipDesc: "文字数・トーン・禁止事項・ターゲットを数値と言葉で明示する。制約が多いほど「使えるアウトプット」に近づく。"
+  },
+  {
+    id: "scqa",
+    label: "⑤SCQA構造",
+    before: `社内向けのAI導入提案書を書いてください。`,
+    after: `以下のSCQA構造で社内向けAI導入提案書の骨子を作成してください。\n\nS(状況): 当社は従業員50名の製造業。事務作業に月平均200時間消費\nC(複雑化): AI規制・セキュリティ懸念から経営陣がDXに消極的\nQ(疑問): どのようにリスクを最小化しつつ導入効果を最大化するか？\nA(答え): 段階的導入ロードマップと定量的ROI提示\n\n形式: 各セクション100字以内でまとめる`,
+    beforeOut: "AI導入のメリットは多岐にわたります。業務効率化、コスト削減、品質向上などが期待できます。導入にあたっては...",
+    afterOut: "【状況】月200時間の事務作業が現場の生産性を圧迫。競合他社のDX化が進む中、当社の対応遅延が競争力低下リスクに直結。\n\n【複雑化】セキュリティ・規制対応への不安から経営層の承認取得が困難。失敗事例の報道が社内合意形成を阻害。\n\n【疑問】どうすれば経営陣の懸念を払拭し、現場負荷なく導入できるか？\n\n【答え】3ヶ月パイロット→効果測定→段階展開。初期投資150万円で年間削減効果480万円（ROI 220%）を達成する計画を提示。",
+    beforeScore: 18,
+    afterScore: 87,
+    tip: "SCQA構造",
+    tipDesc: "コンサルファームで使われるフレームワーク。「なぜこの提案が必要か」のストーリーラインが自動で構成される。説得力の高いビジネス文書に最適。"
+  },
+  {
+    id: "fewshot",
+    label: "⑥Few-shot例示",
+    before: `商品レビューの感情を判定してください。\n「到着が遅れましたが、品質は期待以上でした」`,
+    after: `商品レビューの感情を以下のルールで分類してください。\n\n例1: 「壊れやすくてすぐ返品しました」→ ネガティブ(品質:1, 配送:3)\n例2: 「梱包が丁寧で品物も最高です！」→ ポジティブ(品質:5, 配送:5)\n例3: 「値段の割には普通かな」→ ニュートラル(品質:3, 配送:3)\n\n判定対象:\n「到着が遅れましたが、品質は期待以上でした」`,
+    beforeOut: "このレビューはポジティブとネガティブの両方の要素が含まれています。",
+    afterOut: "ミックス(配送:1, 品質:5)\n\n分析:\n- 「到着が遅れた」→ 配送に不満（ネガティブ要素）\n- 「期待以上の品質」→ 商品品質に高評価（ポジティブ要素）\n\n総合判定: 品質への満足度が高く、リピート購入可能性あり。配送業者への改善フィードバックを推奨。",
+    beforeScore: 30,
+    afterScore: 93,
+    tip: "Few-shot学習（例示）",
+    tipDesc: "入出力ペアの例を2〜3個見せることで、AIが「こういう形式・基準で答えるべき」と学習する。ゼロショットと比べて精度・一貫性が格段に上がる。"
+  },
+  {
+    id: "selfcritique",
+    label: "⑦自己批評",
+    before: `「テレワークの生産性向上」について400字で書いてください。`,
+    after: `「テレワークの生産性向上」について400字で文章を書いてください。\n\nその後、以下の観点で自己採点し、必ず改善版も出力してください：\n- 具体性（数値・事例があるか）: /10\n- 読みやすさ（文章のリズム）: /10\n- 独自性（他と違う視点があるか）: /10\n\n改善版では採点が低かった項目を優先的に修正すること。`,
+    beforeOut: "テレワークでは自己管理が重要です。タスク管理ツールを活用し、集中できる環境を整えましょう。定期的なオンラインMTGで...",
+    afterOut: "【初稿】\nテレワーク2年目のデータが示す真実：自宅勤務者の集中時間は平均4.2時間（オフィス比+1.1時間）。しかし「雑談ゼロ」が創造性を15%低下させることも判明している...\n\n【自己採点】具体性:8 / 読みやすさ:6 / 独自性:7\n\n【改善版】（読みやすさ重視）\nテレワークで「集中力+26%」は本当か？\nNASA研究によれば——",
+    beforeScore: 35,
+    afterScore: 91,
+    tip: "自己批評ループ",
+    tipDesc: "AIに「自分の回答を批評させる」ことで、一発目より高品質な出力が得られる。採点基準を明示するのがコツ。クリエイティブ系タスクで特に効果的。"
+  },
+  {
+    id: "roleplay",
+    label: "⑧役割分担型",
+    before: `新サービスのリスクを教えてください。\nサービス: AIを使った採用面接自動化ツール`,
+    after: `AIを使った採用面接自動化ツールについて、\n以下の3つの立場から意見を述べてください：\n\n🔴 懐疑派（リスクを最大限に指摘する法務担当）\n🟢 推進派（ビジネス効果を強調するCTO）  \n🟡 調停役（両者の落としどころを探るCOO）\n\n各発言は100字以内で。最後に合意案を提示すること。`,
+    beforeOut: "リスクとしては、バイアスの問題、法的リスク、候補者体験の悪化などが考えられます。一方でメリットもあります...",
+    afterOut: "🔴 法務:「雇用機会均等法・個人情報保護法への抵触リスク大。EU AI法でハイリスク分類に該当。訴訟1件で開発費用の10倍のコストが発生する」\n\n🟢 CTO:「面接工数を70%削減。年間1,200万円のコスト削減試算あり。競合他社はすでに導入済み。出遅れると採用競争力が低下する」\n\n🟡 COO:「第1段階は書類スクリーニング補助のみに限定。最終判断は必ず人間が行う設計とし、6ヶ月後に法務監査を実施する」\n\n【合意案】段階的導入＋第三者監査の組み合わせで推進",
+    beforeScore: 32,
+    afterScore: 94,
+    tip: "役割分担型プロンプト",
+    tipDesc: "複数の立場・視点を同時に出力させることで、思考の死角を減らせる。「懐疑派」を入れると批判的思考が自動的に働き、リスク洗い出しに最適。"
+  },
+  {
+    id: "context",
+    label: "⑨コンテキスト圧縮",
+    before: `（長い会議録を貼り付け）\n\nこの会議で決まったことを教えてください。`,
+    after: `以下の会議録から情報を抽出します。\n\n抽出ルール:\n- 決定事項: 「〜することになった」「〜に決定」を含む文のみ\n- 担当者と期限を必ずセットで抽出\n- 未決事項は「要確認」タグをつける\n\n出力形式:\n✅ 決定: [内容] 担当:[名前] 期限:[日付]\n⚠️ 要確認: [内容]\n\n会議録:\n「来週中に田中が仕様書を作成する。デザインは山田に依頼予定だが\nまだ確認中。予算は500万円で承認された。リリース日は未定。」`,
+    beforeOut: "この会議では仕様書の作成やデザイン、予算について話し合われました。いくつかの事項が決定されたようです。",
+    afterOut: "✅ 決定: 仕様書作成　担当:田中　期限:来週中\n✅ 決定: 予算500万円　担当:経営層承認済　期限:確定\n⚠️ 要確認: デザイン担当（山田氏への依頼が未確定）\n⚠️ 要確認: リリース日（未定）\n\n📊 サマリー: 決定2件・要確認2件",
+    beforeScore: 20,
+    afterScore: 96,
+    tip: "コンテキスト圧縮・構造化抽出",
+    tipDesc: "長文を渡す前に「何をどう抽出するか」のルールを先に定義する。出力形式まで指定することで、そのままドキュメントに貼り付け可能な成果物が得られる。"
+  }
+];
+
+let currentIdx = 0;
+
+function render(idx) {
+  const t = techniques[idx];
+  document.getElementById('beforePrompt').textContent = t.before;
+  document.getElementById('afterPrompt').textContent = t.after;
+  document.getElementById('beforeOutput').textContent = t.beforeOut;
+  document.getElementById('afterOutput').textContent = t.afterOut;
+  document.getElementById('beforeBar').style.width = t.beforeScore + '%';
+  document.getElementById('afterBar').style.width  = t.afterScore  + '%';
+  document.getElementById('beforeScore').textContent = t.beforeScore + '/100';
+  document.getElementById('afterScore').textContent  = t.afterScore  + '/100';
+  document.getElementById('tipTitle').textContent = '💡 テクニック: ' + t.tip;
+  document.getElementById('tipDesc').textContent  = t.tipDesc;
+
+  document.querySelectorAll('.tech-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === idx);
+  });
+}
+
+const selector = document.getElementById('techSelector');
+techniques.forEach((t, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tech-btn' + (i === 0 ? ' active' : '');
+  btn.textContent = t.label;
+  btn.onclick = () => { currentIdx = i; render(i); };
+  selector.appendChild(btn);
+});
+
+render(0);
+</script>
+</body>
+</html>
