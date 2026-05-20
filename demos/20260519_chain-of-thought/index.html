@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>Chain-of-Thought プロンプト 思考ステップ可視化デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 800px;
+    width: 1200px;
+    overflow-x: hidden;
+  }
+  .header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-bottom: 1px solid #334155;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header-badge {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+  .header p { font-size: 13px; color: #94a3b8; margin-top: 2px; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: 720px;
+  }
+  .left-panel {
+    padding: 28px 32px;
+    border-right: 1px solid #1e293b;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .right-panel {
+    padding: 28px 32px;
+    background: #0a1628;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 8px;
+  }
+
+  .prompt-tabs {
+    display: flex;
+    gap: 4px;
+    background: #1e293b;
+    padding: 4px;
+    border-radius: 10px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    color: #64748b;
+  }
+  .tab-btn.active {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+  }
+  .tab-btn:hover:not(.active) { color: #cbd5e1; background: #334155; }
+
+  .prompt-box {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #cbd5e1;
+    flex: 1;
+    position: relative;
+    font-family: monospace;
+    white-space: pre-wrap;
+  }
+  .prompt-box.cot-style {
+    border-color: #6366f1;
+    background: #1a1f3a;
+  }
+  .cot-highlight {
+    color: #a5b4fc;
+    font-weight: 600;
+  }
+
+  .run-btn {
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .run-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+  .response-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .accuracy-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .accuracy-badge.low { background: #7f1d1d; color: #fca5a5; }
+  .accuracy-badge.high { background: #14532d; color: #86efac; }
+
+  .thinking-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .step-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.4s ease;
+  }
+  .step-card.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { flex: 1; }
+  .step-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #a5b4fc;
+    margin-bottom: 4px;
+  }
+  .step-text {
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.6;
+  }
+  .step-result {
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #0f172a;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    color: #86efac;
+  }
+
+  .answer-card {
+    background: linear-gradient(135deg, #14532d22, #14532d44);
+    border: 1px solid #22c55e44;
+    border-radius: 10px;
+    padding: 16px;
+    opacity: 0;
+    transition: all 0.4s ease 1.2s;
+  }
+  .answer-card.visible { opacity: 1; }
+  .answer-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #86efac;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .answer-text {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+
+  .plain-response {
+    background: #1e293b;
+    border: 1px solid #7f1d1d;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #fca5a5;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .plain-response.visible { opacity: 1; }
+
+  .comparison-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 16px;
+    background: #1e293b;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .bar-label { color: #64748b; min-width: 80px; }
+  .bar-track {
+    flex: 1;
+    height: 8px;
+    background: #334155;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 0%;
+  }
+  .bar-fill.normal { background: #ef4444; }
+  .bar-fill.cot { background: linear-gradient(90deg, #6366f1, #22c55e); }
+  .bar-value { color: #f1f5f9; font-weight: 700; min-width: 36px; text-align: right; }
+
+  .idle-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: #475569;
+  }
+  .idle-icon { font-size: 48px; opacity: 0.4; }
+
+  .loader {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #334155;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-badge">中級編</div>
+  <div>
+    <h1>Chain-of-Thought プロンプト — 思考ステップ可視化</h1>
+    <p>通常プロンプトとCoTプロンプトの違いをインタラクティブに体験</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: Input Panel -->
+  <div class="left-panel">
+    <div>
+      <div class="section-label">問題例を選択</div>
+      <div class="prompt-tabs">
+        <button class="tab-btn active" onclick="selectProblem(0)">算数問題</button>
+        <button class="tab-btn" onclick="selectProblem(1)">論理パズル</button>
+        <button class="tab-btn" onclick="selectProblem(2)">文章読解</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">プロンプトモードを選択</div>
+      <div class="prompt-tabs">
+        <button class="tab-btn active" id="mode-normal" onclick="setMode('normal')">通常プロンプト</button>
+        <button class="tab-btn" id="mode-cot" onclick="setMode('cot')">CoTプロンプト</button>
+      </div>
+    </div>
+
+    <div style="flex:1">
+      <div class="section-label">送信するプロンプト</div>
+      <div class="prompt-box" id="prompt-display" style="max-height:280px; overflow-y:auto"></div>
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="runDemo()">
+      <span id="btn-icon">▶</span>
+      <span id="btn-text">実行して比較する</span>
+      <div class="loader" id="loader"></div>
+    </button>
+  </div>
+
+  <!-- Right: Output Panel -->
+  <div class="right-panel" id="output-panel">
+    <div class="idle-msg" id="idle-msg">
+      <div class="idle-icon">🧠</div>
+      <p>左のパネルでプロンプトを選択して<br>「実行して比較する」を押してください</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const problems = [
+  {
+    question: "りんごが5個、みかんが3個あります。りんごはみかんの何倍ですか？さらに、合計の果物数は？",
+    normal: "りんごが5個、みかんが3個あります。りんごはみかんの何倍ですか？さらに、合計の果物数は？",
+    cot: `りんごが5個、みかんが3個あります。りんごはみかんの何倍ですか？さらに、合計の果物数は？
+
+<span class="cot-highlight">ステップごとに考えてください：
+Step 1: りんごとみかんの比率を計算する
+Step 2: 合計を計算する
+Step 3: 最終回答をまとめる</span>`,
+    plainAnswer: "1.67倍で、合計は8個です。",
+    plainAccuracy: 40,
+    cotSteps: [
+      { title: "Step 1: 倍率を計算", text: "りんご ÷ みかん の計算を行います", result: "5 ÷ 3 = 1.666... ≈ 1.67倍" },
+      { title: "Step 2: 合計を計算", text: "全果物の合計数を求めます", result: "5 + 3 = 8個" },
+      { title: "Step 3: 回答をまとめる", text: "2つの問いに対して整理された回答を作成します", result: "倍率: 約1.67倍 / 合計: 8個" }
+    ],
+    cotAnswer: "りんごはみかんの約1.67倍（5÷3）です。合計の果物数は8個（5+3）です。",
+    cotAccuracy: 98
+  },
+  {
+    question: "AはBより背が高い。BはCより背が高い。DはAより背が高い。4人を背の高い順に並べてください。",
+    normal: "AはBより背が高い。BはCより背が高い。DはAより背が高い。4人を背の高い順に並べてください。",
+    cot: `AはBより背が高い。BはCより背が高い。DはAより背が高い。4人を背の高い順に並べてください。
+
+<span class="cot-highlight">論理的に推論してください：
+Step 1: 各条件を整理する（A>B, B>C, D>A）
+Step 2: 推移律を使って全体の順序を決定する
+Step 3: 背の高い順に並べる</span>`,
+    plainAnswer: "D > A > B > C の順です。",
+    plainAccuracy: 55,
+    cotSteps: [
+      { title: "Step 1: 条件を整理", text: "与えられた3つの条件をリストアップします", result: "① A > B  ② B > C  ③ D > A" },
+      { title: "Step 2: 推移律を適用", text: "条件を連鎖させて全体の順序を導きます", result: "③+①: D > A > B  →  ①+②: D > A > B > C" },
+      { title: "Step 3: 順位を確定", text: "重複なく4人の順序が確定しました", result: "1位:D  2位:A  3位:B  4位:C" }
+    ],
+    cotAnswer: "背の高い順は D > A > B > C です。条件を連鎖させると D>A>B>C が導かれます。",
+    cotAccuracy: 99
+  },
+  {
+    question: "「太郎は毎朝6時に起きて30分歩く。今日は雨なので歩かなかった」。今日の太郎の起床時刻は何時ですか？",
+    normal: "「太郎は毎朝6時に起きて30分歩く。今日は雨なので歩かなかった」。今日の太郎の起床時刻は何時ですか？",
+    cot: `「太郎は毎朝6時に起きて30分歩く。今日は雨なので歩かなかった」。今日の太郎の起床時刻は何時ですか？
+
+<span class="cot-highlight">注意深く読んで考えてください：
+Step 1: 文章から明示された情報を抽出する
+Step 2: 歩かないことと起床時刻の関係を分析する
+Step 3: 結論を導く</span>`,
+    plainAnswer: "6時30分です（歩かなかったから少し遅くなった）。",
+    plainAccuracy: 25,
+    cotSteps: [
+      { title: "Step 1: 情報を抽出", text: "文章から確実にわかることを抽出します", result: "・起床時刻: 毎朝6時\n・今日は歩かなかった" },
+      { title: "Step 2: 因果関係を分析", text: "「歩かなかった」ことは起床時刻に影響するか？", result: "起床と散歩は別の行動。\n起床後に散歩するかどうかは起床時刻と無関係" },
+      { title: "Step 3: 結論を導出", text: "論理的に矛盾なく答えを導きます", result: "起床時刻は毎朝6時のまま変わらない" }
+    ],
+    cotAnswer: "今日も6時です。雨で歩かなかったことは起床時刻とは無関係です。「毎朝6時に起きる」という習慣は変わっていません。",
+    cotAccuracy: 97
+  }
+];
+
+let currentProblem = 0;
+let currentMode = 'normal';
+let isRunning = false;
+
+function selectProblem(idx) {
+  currentProblem = idx;
+  document.querySelectorAll('.prompt-tabs')[0].querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  updatePromptDisplay();
+  resetOutput();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-normal').classList.toggle('active', mode === 'normal');
+  document.getElementById('mode-cot').classList.toggle('active', mode === 'cot');
+  updatePromptDisplay();
+  resetOutput();
+}
+
+function updatePromptDisplay() {
+  const p = problems[currentProblem];
+  const box = document.getElementById('prompt-display');
+  if (currentMode === 'cot') {
+    box.classList.add('cot-style');
+    box.innerHTML = p.cot;
+  } else {
+    box.classList.remove('cot-style');
+    box.innerHTML = p.normal;
+  }
+}
+
+function resetOutput() {
+  const panel = document.getElementById('output-panel');
+  panel.innerHTML = `<div class="idle-msg" id="idle-msg">
+    <div class="idle-icon">🧠</div>
+    <p>左のパネルでプロンプトを選択して<br>「実行して比較する」を押してください</p>
+  </div>`;
+}
+
+async function runDemo() {
+  if (isRunning) return;
+  isRunning = true;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  document.getElementById('btn-icon').style.display = 'none';
+  document.getElementById('btn-text').textContent = '思考中...';
+  document.getElementById('loader').style.display = 'block';
+
+  const p = problems[currentProblem];
+  const panel = document.getElementById('output-panel');
+  panel.innerHTML = '';
+
+  if (currentMode === 'normal') {
+    await runNormal(p, panel);
+  } else {
+    await runCot(p, panel);
+  }
+
+  btn.disabled = false;
+  document.getElementById('btn-icon').style.display = '';
+  document.getElementById('btn-text').textContent = '実行して比較する';
+  document.getElementById('loader').style.display = 'none';
+  isRunning = false;
+}
+
+async function runNormal(p, panel) {
+  const header = document.createElement('div');
+  header.className = 'response-header';
+  header.innerHTML = `<div class="section-label">通常プロンプトの回答</div>
+    <div class="accuracy-badge low">精度: 低</div>`;
+  panel.appendChild(header);
+
+  await sleep(600);
+
+  const resp = document.createElement('div');
+  resp.className = 'plain-response';
+  resp.textContent = p.plainAnswer;
+  panel.appendChild(resp);
+  await sleep(100);
+  resp.classList.add('visible');
+
+  await sleep(400);
+
+  const compLabel = document.createElement('div');
+  compLabel.className = 'section-label';
+  compLabel.style.marginTop = '16px';
+  compLabel.textContent = '正解率の比較';
+  panel.appendChild(compLabel);
+
+  const bar1 = createBar('通常プロンプト', p.plainAccuracy, 'normal');
+  const bar2 = createBar('CoTプロンプト', p.cotAccuracy, 'cot');
+  panel.appendChild(bar1.el);
+  panel.appendChild(bar2.el);
+
+  await sleep(200);
+  bar1.animate();
+  await sleep(200);
+  bar2.animate();
+
+  await sleep(600);
+
+  const tip = document.createElement('div');
+  tip.style.cssText = 'padding:12px 16px;background:#1e293b;border-radius:10px;font-size:13px;color:#94a3b8;line-height:1.7;margin-top:8px;border-left:3px solid #6366f1';
+  tip.innerHTML = '<strong style="color:#a5b4fc">💡 CoTプロンプトに切り替えると？</strong><br>「ステップごとに考えてください」と指示するだけで、モデルが推論過程を展開して精度が大幅に向上します。';
+  panel.appendChild(tip);
+}
+
+async function runCot(p, panel) {
+  const header = document.createElement('div');
+  header.className = 'response-header';
+  header.innerHTML = `<div class="section-label">CoTプロンプトの思考過程</div>
+    <div class="accuracy-badge high">精度: 高</div>`;
+  panel.appendChild(header);
+
+  const stepsContainer = document.createElement('div');
+  stepsContainer.className = 'thinking-steps';
+  panel.appendChild(stepsContainer);
+
+  for (let i = 0; i < p.cotSteps.length; i++) {
+    await sleep(500);
+    const s = p.cotSteps[i];
+    const card = document.createElement('div');
+    card.className = 'step-card';
+    card.innerHTML = `<div class="step-num">${i + 1}</div>
+      <div class="step-content">
+        <div class="step-title">${s.title}</div>
+        <div class="step-text">${s.text}</div>
+        <div class="step-result">${s.result.replace(/\n/g, '<br>')}</div>
+      </div>`;
+    stepsContainer.appendChild(card);
+    await sleep(50);
+    card.classList.add('visible');
+  }
+
+  await sleep(600);
+  const ansCard = document.createElement('div');
+  ansCard.className = 'answer-card';
+  ansCard.innerHTML = `<div class="answer-label">✅ 最終回答</div>
+    <div class="answer-text">${p.cotAnswer}</div>`;
+  panel.appendChild(ansCard);
+  await sleep(50);
+  ansCard.classList.add('visible');
+
+  await sleep(800);
+  const compLabel = document.createElement('div');
+  compLabel.className = 'section-label';
+  compLabel.textContent = '通常プロンプトとの正解率比較';
+  panel.appendChild(compLabel);
+
+  const bar1 = createBar('通常プロンプト', p.plainAccuracy, 'normal');
+  const bar2 = createBar('CoTプロンプト', p.cotAccuracy, 'cot');
+  panel.appendChild(bar1.el);
+  panel.appendChild(bar2.el);
+  await sleep(200);
+  bar1.animate();
+  await sleep(200);
+  bar2.animate();
+}
+
+function createBar(label, value, type) {
+  const el = document.createElement('div');
+  el.className = 'comparison-bar';
+  el.innerHTML = `<div class="bar-label">${label}</div>
+    <div class="bar-track"><div class="bar-fill ${type}" id="bar-${type}-${Date.now()}"></div></div>
+    <div class="bar-value">${value}%</div>`;
+  return {
+    el,
+    animate() {
+      const fill = el.querySelector('.bar-fill');
+      requestAnimationFrame(() => { fill.style.width = value + '%'; });
+    }
+  };
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Initialize
+updatePromptDisplay();
+</script>
+</body>
+</html>
