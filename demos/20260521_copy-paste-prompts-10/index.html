@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1200" />
+  <title>今日から使えるClaudeプロンプト10選【仕事効率化】</title>
+  <style>
+    :root {
+      --primary: #6B4EFF;
+      --primary-light: #EDE9FF;
+      --secondary: #FF6B6B;
+      --accent: #00C9A7;
+      --bg: #F7F6FF;
+      --card-bg: #FFFFFF;
+      --text: #1A1A2E;
+      --text-muted: #6B6B8A;
+      --border: #E2E0FF;
+      --shadow: 0 4px 24px rgba(107,78,255,0.10);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 800px;
+      width: 1200px;
+    }
+
+    header {
+      background: linear-gradient(135deg, #6B4EFF 0%, #A78BFA 60%, #60D4F7 100%);
+      padding: 32px 48px 28px;
+      color: white;
+    }
+    header h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.3;
+    }
+    header p {
+      margin-top: 8px;
+      font-size: 14px;
+      opacity: 0.85;
+    }
+    .badge-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .badge {
+      background: rgba(255,255,255,0.22);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 0;
+      height: 680px;
+    }
+
+    /* ---- Sidebar ---- */
+    .sidebar {
+      background: white;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px 0;
+    }
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0 18px 10px;
+    }
+    .cat-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .cat-item:hover { background: var(--primary-light); }
+    .cat-item.active {
+      background: var(--primary-light);
+      border-left-color: var(--primary);
+    }
+    .cat-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .cat-label {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .cat-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ---- Content ---- */
+    .content {
+      overflow-y: auto;
+      padding: 28px 36px;
+      background: var(--bg);
+    }
+    .prompt-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 24px 26px 20px;
+      display: none;
+    }
+    .prompt-card.active { display: block; }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .card-meta h2 {
+      font-size: 19px;
+      font-weight: 800;
+    }
+    .card-meta p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .level-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .scenario {
+      background: #F8F7FF;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.7;
+      border-left: 3px solid var(--primary);
+    }
+    .scenario strong { color: var(--primary); }
+
+    .prompt-box {
+      background: #1A1A2E;
+      color: #E8E8F5;
+      border-radius: 10px;
+      padding: 18px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      position: relative;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-bottom: 14px;
+    }
+    .prompt-box .placeholder {
+      color: #F0A500;
+      font-weight: 700;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .copy-btn:hover { background: #5A3FD6; }
+    .copy-btn:active { transform: scale(0.96); }
+    .copy-btn.copied { background: var(--accent); }
+
+    .tip-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .tip {
+      background: #FAFAFA;
+      border: 1px solid #E8E8F5;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+    }
+    .tip-icon { flex-shrink: 0; }
+
+    .nav-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    .nav-btn {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nav-btn:hover { background: var(--primary); color: white; }
+    .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .progress-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-bottom: 20px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    /* footer inside card */
+    .card-counter {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📋 コピペするだけ！今日から使えるClaudeプロンプト10選</h1>
+  <p>【 〇〇 】をあなたの情報に置き換えてそのまま使えます</p>
+  <div class="badge-row">
+    <span class="badge">🎯 初級編</span>
+    <span class="badge">⚡ 仕事効率化</span>
+    <span class="badge">📌 即使えるテンプレート</span>
+    <span class="badge">🔄 コピペOK</span>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-title">プロンプト一覧</div>
+    <div id="sidebar-list"></div>
+  </nav>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:10%"></div>
+    </div>
+    <div id="cards-container"></div>
+  </div>
+</div>
+
+<script>
+const prompts = [
+  {
+    icon: "✉️",
+    color: "#EDE9FF",
+    iconBg: "#6B4EFF",
+    title: "ビジネスメール作成",
+    sub: "返信・依頼・お礼に",
+    level: "汎用", levelColor: "#6B4EFF", levelBg: "#EDE9FF",
+    scenario: "📌 <strong>シーン：</strong>社外の取引先に打ち合わせのお礼と次回アポを依頼したい",
+    prompt: `以下の状況でビジネスメールを書いてください。
+
+【宛先】〇〇株式会社 △△部 □□様
+【関係性】取引先（親しみやすい丁寧語でOK）
+【目的】先日の打ち合わせのお礼 ＋ 次回日程の打診
+【伝えたい内容】
+・先週の打ち合わせで〇〇の点がとても参考になった
+・次のステップとして〇〇を提案したい
+・来週中に30分ほど時間をもらえるか確認したい
+
+メールの長さは200〜300字程度。件名も一緒に考えてください。`,
+    tips: ["💡 「関係性」を変えると文体が自動で切り替わる", "💡 「目的」を複数書けば複合メールも対応"]
+  },
+  {
+    icon: "📝",
+    color: "#FFF3E0",
+    iconBg: "#FF9800",
+    title: "議事録の自動整理",
+    sub: "会議メモ → 議事録へ",
+    level: "時短", levelColor: "#FF9800", levelBg: "#FFF3E0",
+    scenario: "📌 <strong>シーン：</strong>走り書きした会議メモをきれいな議事録にしたい",
+    prompt: `以下の会議メモを議事録形式に整形してください。
+
+【会議名】〇〇プロジェクト 定例MTG
+【日時】〇月〇日 〇時〜〇時
+【参加者】〇〇、〇〇、〇〇
+
+【メモ（走り書き）】
+〇〇について検討→〇〇さんが△△案を提案
+→懸念点は納期とコスト
+→来週までに見積もりを出す（担当：〇〇）
+次回MTGは〇月〇日
+
+以下のフォーマットで整理してください：
+・決定事項
+・ネクストアクション（担当者・期日付き）
+・継続検討事項`,
+    tips: ["💡 メモはどんなに雑でもOK。箇条書きで貼るだけ", "💡 担当者・期日が曖昧な場合は〔要確認〕と出力してもらえる"]
+  },
+  {
+    icon: "📄",
+    color: "#E8F5E9",
+    iconBg: "#43A047",
+    title: "長文ドキュメントの要約",
+    sub: "会議資料・報告書・論文に",
+    level: "時短", levelColor: "#43A047", levelBg: "#E8F5E9",
+    scenario: "📌 <strong>シーン：</strong>長い報告書や仕様書を素早くキャッチアップしたい",
+    prompt: `以下のドキュメントを要約してください。
+
+【ドキュメント種別】〇〇（例：業務報告書/提案資料/仕様書）
+【読む目的】〇〇（例：意思決定のポイントを把握したい）
+【要約の形式】
+1. 3行サマリー（誰でも分かるように）
+2. 重要ポイント（箇条書き5点以内）
+3. 要注意・要確認事項
+
+【本文】
+〇〇〇〇〇〇（ここに文章を貼る）`,
+    tips: ["💡 「読む目的」を明示すると要約の切り口が変わる", "💡 英語文書でも日本語要約を出力してもらえる"]
+  },
+  {
+    icon: "🧠",
+    color: "#F3E5F5",
+    iconBg: "#9C27B0",
+    title: "アイデア出し（ブレスト）",
+    sub: "企画・施策・タイトルに",
+    level: "企画", levelColor: "#9C27B0", levelBg: "#F3E5F5",
+    scenario: "📌 <strong>シーン：</strong>新サービスの機能案や記事タイトルを大量に出したい",
+    prompt: `以下のテーマで、アイデアを〇〇個出してください。
+
+【テーマ】〇〇（例：社内コミュニケーション改善のための新機能）
+【対象ユーザー】〇〇（例：リモートワーク中の20〜30代）
+【制約条件】〇〇（例：開発コスト小・3ヶ月で実装可能）
+
+アイデアごとに以下を記載：
+- アイデア名（10字以内）
+- 一言説明（30字以内）
+- 期待効果
+
+最後に特に面白いと思うアイデアTop3とその理由を教えてください。`,
+    tips: ["💡 個数を指定すると手を抜かずに出してくれる", "💡 「意外性重視」「現実的重視」など方向性も指定可能"]
+  },
+  {
+    icon: "📊",
+    color: "#E3F2FD",
+    iconBg: "#1976D2",
+    title: "報告書・レポート作成",
+    sub: "月次報告・業務報告に",
+    level: "文書", levelColor: "#1976D2", levelBg: "#E3F2FD",
+    scenario: "📌 <strong>シーン：</strong>データや実績から報告書の本文を素早く書きたい",
+    prompt: `以下の情報から、ビジネス報告書の本文を書いてください。
+
+【報告タイプ】〇〇（例：月次営業報告）
+【対象期間】〇年〇月
+【実績データ】
+・〇〇：△△（目標比□□%）
+・〇〇：△△（前月比□□%）
+・〇〇：△△
+
+【特記事項】〇〇（例：〇〇の施策が効果的だった）
+【課題・懸念点】〇〇
+
+構成：
+① 概況（2〜3行）
+② 数値サマリー（表形式）
+③ 成功要因・課題分析
+④ 来月の対策・アクションプラン`,
+    tips: ["💡 数字を入れると根拠のある文章を生成してくれる", "💡 「対象読者（役員向け/現場向け）」を追記すると文体が変わる"]
+  },
+  {
+    icon: "🎯",
+    color: "#FFF8E1",
+    iconBg: "#F9A825",
+    title: "タスク整理・優先順位付け",
+    sub: "TODOリスト・週次計画に",
+    level: "整理", levelColor: "#F9A825", levelBg: "#FFF8E1",
+    scenario: "📌 <strong>シーン：</strong>頭の中のタスクが混乱していて優先順位をつけたい",
+    prompt: `以下のタスク一覧を整理し、今日やるべき順番に並べ直してください。
+
+【今日の締め切り/イベント】〇〇
+【利用可能な時間】〇時間
+【タスク一覧（思いついたまま）】
+・〇〇
+・〇〇
+・〇〇
+・〇〇
+・〇〇
+
+出力形式：
+1. 緊急×重要（今すぐやる）
+2. 重要だが緊急でない（今日中）
+3. 緊急だが重要でない（後回し可）
+4. どちらでもない（今日はやらない）
+
+各タスクの目安時間も教えてください。`,
+    tips: ["💡 タスクを箇条書きで貼るだけでマトリクス分類してくれる", "💡 「今日の目標」を添えると取捨選択がより的確になる"]
+  },
+  {
+    icon: "💬",
+    color: "#E0F7FA",
+    iconBg: "#00ACC1",
+    title: "顧客対応・クレーム返信",
+    sub: "丁寧かつ的確な文章に",
+    level: "対応", levelColor: "#00ACC1", levelBg: "#E0F7FA",
+    scenario: "📌 <strong>シーン：</strong>クレームや問い合わせに適切な返信文を素早く作りたい",
+    prompt: `以下の状況に合わせた顧客返信文を作成してください。
+
+【問い合わせ内容】
+〇〇〇〇（顧客の言葉をそのまま貼る）
+
+【状況】
+・弊社の対応：〇〇（例：〇〇の対応が遅れた）
+・弊社の方針：〇〇（例：全額返金/対応策を提示）
+・制約：〇〇（例：具体的な原因はまだ調査中）
+
+返信文の条件：
+- 誠実かつ迅速な対応姿勢を示す
+- 謝罪は過剰にならず、解決策に重点を置く
+- 300字以内
+- メール形式（件名付き）`,
+    tips: ["💡 「制約」を書くと言えない情報を含まない文章を作ってくれる", "💡 SNS返信用に「140字以内」と指定することも可能"]
+  },
+  {
+    icon: "🔍",
+    color: "#FCE4EC",
+    iconBg: "#E91E63",
+    title: "問題分析・原因究明",
+    sub: "トラブル・失敗の振り返りに",
+    level: "分析", levelColor: "#E91E63", levelBg: "#FCE4EC",
+    scenario: "📌 <strong>シーン：</strong>プロジェクトの失敗やトラブルの原因を多面的に分析したい",
+    prompt: `以下の問題について、原因と対策を分析してください。
+
+【発生した問題】〇〇（例：プロジェクトが1ヶ月遅延した）
+
+【状況の詳細】
+・いつ：〇〇
+・誰が関係：〇〇
+・何が起きたか：〇〇
+
+分析フレームワーク：
+① なぜなぜ分析（5回のWhy）
+② 影響範囲と深刻度（高・中・低）
+③ 真因の特定
+④ 再発防止策（短期・長期）
+⑤ 今後の監視指標（KPI）
+
+客観的・論理的に分析してください。感情的な表現は避けて。`,
+    tips: ["💡 「感情的な表現は避けて」が冷静な分析を引き出すコツ", "💡 フレームワーク名（PDCA/4M分析など）を指定することも可能"]
+  },
+  {
+    icon: "📚",
+    color: "#E8F5E9",
+    iconBg: "#2E7D32",
+    title: "ブログ・SNS文章の下書き",
+    sub: "note・X（Twitter）・Linkedin",
+    level: "発信", levelColor: "#2E7D32", levelBg: "#E8F5E9",
+    scenario: "📌 <strong>シーン：</strong>伝えたいことはあるが文章化するのが面倒なとき",
+    prompt: `以下のネタをもとに、〇〇向けの文章を書いてください。
+
+【媒体】〇〇（例：note記事/X（Twitter）ポスト/LinkedIn投稿）
+【伝えたいこと（箇条書きでOK）】
+・〇〇を経験した
+・そこから〇〇を学んだ
+・読者に〇〇してほしい
+
+【トーン】〇〇（例：親しみやすく実用的に）
+【文字数】〇〇字程度
+
+最初の1〜2行で読者を引き込む「フック」を必ず入れてください。
+ハッシュタグの提案も3つ添えてください。`,
+    tips: ["💡 箇条書きのメモを渡すだけで記事の骨格を作ってくれる", "💡 「フック必須」を明示すると冒頭の引力が格段に上がる"]
+  },
+  {
+    icon: "🗓️",
+    color: "#F1F8E9",
+    iconBg: "#558B2F",
+    title: "スケジュール・計画立案",
+    sub: "プロジェクト計画・勉強計画に",
+    level: "計画", levelColor: "#558B2F", levelBg: "#F1F8E9",
+    scenario: "📌 <strong>シーン：</strong>目標から逆算した現実的なスケジュールを作りたい",
+    prompt: `以下の目標に向けた実行計画を作ってください。
+
+【ゴール】〇〇（例：3ヶ月後に〇〇資格に合格する）
+【現在地】〇〇（例：基礎知識ゼロ、1日1時間確保可能）
+【制約・条件】
+・毎日使える時間：〇時間
+・休みの日：〇曜日
+・締め切り：〇月〇日
+
+出力形式：
+① フェーズ分割（準備→学習→仕上げ）
+② 週次マイルストーン
+③ 1日のタスク例（月〜金）
+④ リスクと対処法
+
+現実的で継続しやすい計画にしてください。`,
+    tips: ["💡 「現在地」を正直に書くほどリアルな計画が出てくる", "💡 「継続しやすい」と書くと無理のないペース配分をしてくれる"]
+  }
+];
+
+let currentIdx = 0;
+
+// Build sidebar
+const sidebarList = document.getElementById('sidebar-list');
+prompts.forEach((p, i) => {
+  const el = document.createElement('div');
+  el.className = 'cat-item' + (i === 0 ? ' active' : '');
+  el.innerHTML = `
+    <div class="cat-icon" style="background:${p.color}">${p.icon}</div>
+    <div>
+      <div class="cat-label">${p.title}</div>
+      <div class="cat-sub">${p.sub}</div>
+    </div>`;
+  el.addEventListener('click', () => showCard(i));
+  sidebarList.appendChild(el);
+});
+
+// Build cards
+const container = document.getElementById('cards-container');
+prompts.forEach((p, i) => {
+  const tipsHTML = p.tips.map(t => `<div class="tip"><span class="tip-icon">${t.slice(0,2)}</span><span>${t.slice(2)}</span></div>`).join('');
+  const promptDisplay = p.prompt
+    .replace(/〇〇/g, '<span class="placeholder">〇〇</span>')
+    .replace(/△△/g, '<span class="placeholder">△△</span>')
+    .replace(/□□/g, '<span class="placeholder">□□</span>');
+
+  const card = document.createElement('div');
+  card.className = 'prompt-card' + (i === 0 ? ' active' : '');
+  card.id = `card-${i}`;
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-icon" style="background:${p.color}">${p.icon}</div>
+      <div class="card-meta">
+        <h2>${i+1}. ${p.title}</h2>
+        <p>${p.sub}</p>
+        <span class="level-tag" style="color:${p.levelColor};background:${p.levelBg}">${p.level}</span>
+      </div>
+    </div>
+    <div class="scenario">${p.scenario}</div>
+    <div class="prompt-box" id="prompt-${i}">${promptDisplay}<button class="copy-btn" id="copy-${i}" onclick="copyPrompt(${i})">📋 コピー</button></div>
+    <div class="tip-row">${tipsHTML}</div>
+    <div class="nav-row">
+      <button class="nav-btn" onclick="showCard(${i-1})" ${i===0?'disabled':''}>← 前へ</button>
+      <div class="card-counter">${i+1} / ${prompts.length}</div>
+      <button class="nav-btn" onclick="showCard(${i+1})" ${i===prompts.length-1?'disabled':''}>次へ →</button>
+    </div>`;
+  container.appendChild(card);
+});
+
+function showCard(idx) {
+  if (idx < 0 || idx >= prompts.length) return;
+  document.querySelectorAll('.prompt-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+  document.querySelectorAll('.cat-item').forEach((c, i) => c.classList.toggle('active', i === idx));
+  document.getElementById('progress-fill').style.width = `${((idx+1)/prompts.length)*100}%`;
+  currentIdx = idx;
+}
+
+function copyPrompt(idx) {
+  const raw = prompts[idx].prompt;
+  navigator.clipboard.writeText(raw).then(() => {
+    const btn = document.getElementById(`copy-${idx}`);
+    btn.textContent = '✅ コピー完了！';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 コピー';
+      btn.classList.remove('copied');
+    }, 1800);
+  });
+}
+</script>
+</body>
+</html>
