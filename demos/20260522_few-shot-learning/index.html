@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Few-shot学習 体験デモ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      min-height: 100vh;
+      color: #e0e0e0;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1150px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: #a0a0c0;
+      font-size: 0.95rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: linear-gradient(90deg, #7c3aed, #4f46e5);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 99px;
+      margin-bottom: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ─── MAIN LAYOUT ─── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(6px);
+    }
+
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #7c9eff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-title .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4f46e5;
+    }
+
+    /* ─── SHOT SELECTOR ─── */
+    .shot-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .shot-tab {
+      padding: 8px 18px;
+      border-radius: 99px;
+      border: 2px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.05);
+      color: #aaa;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .shot-tab.active {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 0 16px rgba(79,70,229,0.5);
+    }
+
+    .shot-tab:hover:not(.active) {
+      border-color: #7c9eff;
+      color: #c0d0ff;
+    }
+
+    /* ─── PROMPT AREA ─── */
+    .prompt-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      line-height: 1.65;
+      color: #d0d0e8;
+      white-space: pre-wrap;
+      min-height: 220px;
+      transition: all 0.3s;
+    }
+
+    .highlight-example {
+      color: #86efac;  /* green for examples */
+    }
+    .highlight-task {
+      color: #fbbf24;  /* amber for task */
+    }
+    .highlight-label {
+      color: #93c5fd;  /* blue for labels */
+    }
+    .highlight-zero {
+      color: #f87171;  /* red for zero-shot */
+    }
+
+    /* ─── OUTPUT AREA ─── */
+    .output-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: #e2e8f0;
+      min-height: 220px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .output-box .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: #7c9eff;
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    .quality-badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .q-low  { background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid #ef4444; }
+    .q-mid  { background: rgba(245,158,11,0.25); color: #fcd34d; border: 1px solid #f59e0b; }
+    .q-high { background: rgba(34,197,94,0.25); color: #86efac; border: 1px solid #22c55e; }
+
+    /* ─── SCORE BAR ─── */
+    .score-section {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .score-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .score-card:hover { transform: translateY(-2px); }
+    .score-card.current { border-color: #4f46e5; box-shadow: 0 0 20px rgba(79,70,229,0.3); }
+
+    .score-label { font-size: 0.78rem; color: #888; margin-bottom: 6px; }
+    .score-title { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 10px; }
+
+    .score-bar-bg {
+      background: rgba(255,255,255,0.1);
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+    .fill-zero  { background: linear-gradient(90deg, #ef4444, #f97316); }
+    .fill-one   { background: linear-gradient(90deg, #f59e0b, #eab308); }
+    .fill-three { background: linear-gradient(90deg, #22c55e, #16a34a); }
+
+    .score-num { font-size: 1.3rem; font-weight: 800; color: #7c9eff; }
+
+    /* ─── LEGEND ─── */
+    .legend {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding-top: 4px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #aaa; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* ─── ANIMATE ─── */
+    .fade-in { animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+    /* ─── STEP INDICATOR ─── */
+    .steps-indicator {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin: 4px 0;
+    }
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      max-width: 160px;
+    }
+    .step-circle {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #888;
+      transition: all 0.3s;
+    }
+    .step-circle.active { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+    .step-circle.done { border-color: #22c55e; background: #22c55e; color: #fff; }
+    .step-label { font-size: 0.72rem; color: #777; text-align: center; }
+    .step-connector { height: 2px; flex: 1; background: rgba(255,255,255,0.1); margin-top: -20px; }
+    .step-connector.done { background: #22c55e; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="badge">中級編 インタラクティブデモ</div>
+    <h1>🎯 Few-shot学習を体験しよう</h1>
+    <p>例文の数を変えて、Claudeの回答品質がどう変わるか確かめましょう</p>
+  </header>
+
+  <!-- Shot selector -->
+  <div style="text-align:center; margin-bottom:18px;">
+    <div class="shot-tabs" style="justify-content:center;">
+      <button class="shot-tab" onclick="selectShot(0)" id="tab-0">0-shot（例なし）</button>
+      <button class="shot-tab" onclick="selectShot(1)" id="tab-1">1-shot（例1つ）</button>
+      <button class="shot-tab active" onclick="selectShot(3)" id="tab-3">3-shot（例3つ）✨</button>
+    </div>
+    <p style="font-size:0.82rem; color:#888; margin-top:-4px;">タブをクリックして切り替え</p>
+  </div>
+
+  <div class="layout">
+
+    <!-- Step progress -->
+    <div class="steps-indicator">
+      <div class="step-item">
+        <div class="step-circle done" id="step1">1</div>
+        <div class="step-label">例文を選ぶ</div>
+      </div>
+      <div class="step-connector done" id="conn1"></div>
+      <div class="step-item">
+        <div class="step-circle active" id="step2">2</div>
+        <div class="step-label">プロンプト確認</div>
+      </div>
+      <div class="step-connector" id="conn2"></div>
+      <div class="step-item">
+        <div class="step-circle" id="step3">3</div>
+        <div class="step-label">出力を比較</div>
+      </div>
+    </div>
+
+    <!-- Prompt panel -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot"></div>実際に送るプロンプト</div>
+      <div class="prompt-box" id="promptBox"></div>
+    </div>
+
+    <!-- Output panel -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#22c55e;"></div>Claudeの回答（模擬）</div>
+      <div class="output-box" id="outputBox">
+        <span class="quality-badge" id="qualityBadge"></span>
+        <div id="outputText"></div>
+      </div>
+    </div>
+
+    <!-- Score cards -->
+    <div class="score-section">
+      <div class="score-card" id="card-0" onclick="selectShot(0)">
+        <div class="score-label">0-shot</div>
+        <div class="score-title">例なしで聞く</div>
+        <div class="score-bar-bg">
+          <div class="score-bar-fill fill-zero" id="bar-0" style="width:0%"></div>
+        </div>
+        <div class="score-num">35<span style="font-size:0.7rem;color:#666">/100</span></div>
+        <div style="font-size:0.75rem; color:#f87171; margin-top:6px;">❌ 書式がバラバラ</div>
+      </div>
+      <div class="score-card" id="card-1" onclick="selectShot(1)">
+        <div class="score-label">1-shot</div>
+        <div class="score-title">例1つで誘導</div>
+        <div class="score-bar-bg">
+          <div class="score-bar-fill fill-one" id="bar-1" style="width:0%"></div>
+        </div>
+        <div class="score-num">68<span style="font-size:0.7rem;color:#666">/100</span></div>
+        <div style="font-size:0.75rem; color:#fcd34d; margin-top:6px;">⚠ まあまあ整っている</div>
+      </div>
+      <div class="score-card current" id="card-3" onclick="selectShot(3)">
+        <div class="score-label">3-shot</div>
+        <div class="score-title">例3つで精度最大化</div>
+        <div class="score-bar-bg">
+          <div class="score-bar-fill fill-three" id="bar-3" style="width:0%"></div>
+        </div>
+        <div class="score-num">94<span style="font-size:0.7rem;color:#666">/100</span></div>
+        <div style="font-size:0.75rem; color:#86efac; margin-top:6px;">✅ 書式・内容ともに完璧</div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac;"></div>例文（shot）</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>今回のタスク</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#93c5fd;"></div>ラベル・区切り</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const data = {
+    0: {
+      prompt: `【タスク】
+以下の商品レビューを1〜5点で評価し、
+ポジティブ点とネガティブ点を箇条書きにしてください。
+
+レビュー: "価格は安いですが、届くまで2週間かかりました。
+品質自体は悪くないので、急がない方にはおすすめです。"`,
+      output: `レビューを分析しました。
+
+このレビューは全体的に中立的な評価です。価格については安いと感じており、品質も悪くないとのことです。ただし配送に2週間かかったことへの不満が見受けられます。急ぎでない方には推薦できるという結論です。
+
+評価としては3点程度が妥当でしょうか。`,
+      quality: 'low',
+      qualityText: '品質: 低 🔴'
+    },
+    1: {
+      prompt: `【書式の例】
+入力: "バッテリーの持ちが素晴らしい。デザインも好み。ただし少し重い。"
+
+出力:
+★★★★☆ (4/5点)
+✅ ポジティブ:
+・バッテリー持続性が高い
+・デザインが好評
+❌ ネガティブ:
+・重量がやや重い
+
+---
+
+【タスク】
+入力: "価格は安いですが、届くまで2週間かかりました。品質自体は悪くないので、急がない方にはおすすめです。"
+
+出力:`,
+      output: `★★★☆☆ (3/5点)
+✅ ポジティブ:
+・価格が安い
+・品質は問題なし
+❌ ネガティブ:
+・配送に2週間かかった`,
+      quality: 'mid',
+      qualityText: '品質: 中 🟡'
+    },
+    3: {
+      prompt: `【書式の例 1】
+入力: "バッテリーの持ちが素晴らしい。デザインも好み。ただし少し重い。"
+出力:
+★★★★☆ (4/5点)
+✅ ポジティブ:・バッテリー持続性が高い ・デザインが好評
+❌ ネガティブ:・重量がやや重い
+💡 総評: 機能性重視の方に最適
+
+【書式の例 2】
+入力: "カメラが最高！でもアプリがよく落ちる。サポートも遅い。"
+出力:
+★★★☆☆ (3/5点)
+✅ ポジティブ:・カメラ性能が非常に高い
+❌ ネガティブ:・アプリの安定性に問題 ・サポート対応が遅い
+💡 総評: カメラ用途に絞るなら検討の余地あり
+
+【書式の例 3】
+入力: "コスパ最高。毎日使っています。不満はほぼゼロ。"
+出力:
+★★★★★ (5/5点)
+✅ ポジティブ:・価格と品質のバランスが優秀 ・日常使いに最適
+❌ ネガティブ:・特になし
+💡 総評: 迷っているなら即購入を推奨
+
+---
+
+【タスク】
+入力: "価格は安いですが、届くまで2週間かかりました。品質自体は悪くないので、急がない方にはおすすめです。"
+出力:`,
+      output: `★★★☆☆ (3/5点)
+✅ ポジティブ:
+・価格がリーズナブルで手を出しやすい
+・品質は期待を裏切らない水準
+❌ ネガティブ:
+・配送リードタイムが2週間と長め
+💡 総評: 急ぎでない購入には十分おすすめできる選択肢`,
+      quality: 'high',
+      qualityText: '品質: 高 🟢'
+    }
+  };
+
+  let currentShot = 3;
+
+  function animateBars() {
+    setTimeout(() => { document.getElementById('bar-0').style.width = '35%'; }, 200);
+    setTimeout(() => { document.getElementById('bar-1').style.width = '68%'; }, 400);
+    setTimeout(() => { document.getElementById('bar-3').style.width = '94%'; }, 600);
+  }
+
+  function colorizePrompt(text) {
+    // Color-code parts of the prompt
+    return text
+      .replace(/(【書式の例.*?】)/g, '<span class="highlight-label">$1</span>')
+      .replace(/(【タスク】)/g, '<span class="highlight-task">$1</span>')
+      .replace(/(入力:.*)/g, '<span class="highlight-example">$1</span>')
+      .replace(/(出力:)/g, '<span class="highlight-label">$1</span>')
+      .replace(/(---)/g, '<span style="color:#555">---</span>');
+  }
+
+  function typeText(element, text, speed=18) {
+    element.innerHTML = '';
+    let i = 0;
+    const cursor = document.createElement('span');
+    cursor.className = 'typing-cursor';
+    element.appendChild(cursor);
+
+    const interval = setInterval(() => {
+      if (i < text.length) {
+        cursor.insertAdjacentText('beforebegin', text[i]);
+        i++;
+      } else {
+        clearInterval(interval);
+        cursor.remove();
+        // Mark step 3 as done
+        document.getElementById('step3').className = 'step-circle done';
+        document.getElementById('conn2').className = 'step-connector done';
+      }
+    }, speed);
+  }
+
+  function selectShot(n) {
+    currentShot = n;
+
+    // Update tabs
+    [0,1,3].forEach(x => {
+      document.getElementById('tab-'+x).classList.toggle('active', x===n);
+    });
+
+    // Update score cards
+    ['card-0','card-1','card-3'].forEach(id => {
+      document.getElementById(id).classList.remove('current');
+    });
+    const cardId = n===3 ? 'card-3' : n===1 ? 'card-1' : 'card-0';
+    document.getElementById(cardId).classList.add('current');
+
+    // Update prompt
+    const d = data[n];
+    const promptBox = document.getElementById('promptBox');
+    promptBox.classList.remove('fade-in');
+    void promptBox.offsetWidth;
+    promptBox.classList.add('fade-in');
+    promptBox.innerHTML = colorizePrompt(d.prompt);
+
+    // Update quality badge
+    const badge = document.getElementById('qualityBadge');
+    badge.textContent = d.qualityText;
+    badge.className = 'quality-badge ' + (d.quality==='high'?'q-high':d.quality==='mid'?'q-mid':'q-low');
+
+    // Update steps
+    document.getElementById('step3').className = 'step-circle';
+    document.getElementById('conn2').className = 'step-connector';
+
+    // Type output
+    typeText(document.getElementById('outputText'), d.output, n===3 ? 14 : 12);
+  }
+
+  // Init
+  animateBars();
+  selectShot(3);
+</script>
+</body>
+</html>

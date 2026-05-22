@@ -7,7 +7,7 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.setViewport({ width: 1200, height: 800 });
 await page.goto(`file://${path.resolve(demoPath)}`);
-await new Promise(r => setTimeout(r, 800));
+await new Promise(r => setTimeout(r, 1200));
 await page.screenshot({ path: outputPath });
 await browser.close();
 console.log('done:', outputPath);
