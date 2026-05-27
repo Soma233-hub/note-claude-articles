@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudeエージェント設計パターン インタラクティブデモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #a78bfa;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  .subtitle {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .tab {
+    padding: 8px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    background: #1e2130;
+    color: #94a3b8;
+  }
+  .tab.active {
+    background: #312e81;
+    color: #a78bfa;
+    border-color: #7c3aed;
+  }
+  .tab:hover:not(.active) {
+    background: #252840;
+    color: #c4b5fd;
+  }
+  .demo-area {
+    display: none;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .demo-area.active { display: block; }
+
+  /* ===== Pattern 1: Task Decomposition ===== */
+  .decomp-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .input-panel, .output-panel {
+    background: #1e2130;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #2d3148;
+  }
+  .panel-title {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .task-input {
+    width: 100%;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 12px;
+    font-size: 0.875rem;
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .task-input:focus { outline: none; border-color: #7c3aed; }
+  .run-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .run-btn:hover { opacity: 0.85; }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .subtask-list { list-style: none; }
+  .subtask-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #111827;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border-left: 3px solid #7c3aed;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.4s;
+  }
+  .subtask-item.show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .subtask-num {
+    background: #7c3aed;
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .subtask-text { font-size: 0.85rem; line-height: 1.5; }
+  .subtask-status {
+    margin-left: auto;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #1e3a2f;
+    color: #34d399;
+  }
+
+  /* ===== Pattern 2: Loop Control ===== */
+  .loop-viz {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .loop-steps {
+    background: #1e2130;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2d3148;
+  }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .step-item.current {
+    background: #312e81;
+    border: 1px solid #7c3aed;
+  }
+  .step-item.done {
+    background: #0f2f23;
+    border: 1px solid #065f46;
+  }
+  .step-icon { font-size: 1.2rem; }
+  .step-label { font-size: 0.8rem; font-weight: 600; }
+  .loop-log {
+    background: #111827;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #1f2937;
+    min-height: 260px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    line-height: 1.8;
+    overflow-y: auto;
+    max-height: 340px;
+  }
+  .log-line { opacity: 0; animation: fadeIn 0.3s forwards; }
+  .log-line.info { color: #60a5fa; }
+  .log-line.success { color: #34d399; }
+  .log-line.warn { color: #fbbf24; }
+  .log-line.error { color: #f87171; }
+  .log-line.muted { color: #475569; }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .loop-controls {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .ctrl-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #374151;
+    background: #1e2130;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .ctrl-btn.primary {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border-color: transparent;
+    color: white;
+  }
+  .ctrl-btn:hover { opacity: 0.85; }
+
+  /* ===== Pattern 3: Tool Integration ===== */
+  .tool-flow {
+    display: grid;
+    grid-template-columns: 1fr 200px;
+    gap: 16px;
+  }
+  .conversation-panel {
+    background: #1e2130;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2d3148;
+    min-height: 300px;
+  }
+  .tools-panel {
+    background: #1e2130;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #2d3148;
+  }
+  .tool-card {
+    background: #111827;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #1f2937;
+    transition: all 0.3s;
+    font-size: 0.8rem;
+  }
+  .tool-card.active {
+    border-color: #7c3aed;
+    background: #1e1654;
+    box-shadow: 0 0 12px rgba(124,58,237,0.3);
+  }
+  .tool-name { font-weight: 700; color: #a78bfa; margin-bottom: 3px; }
+  .tool-desc { color: #64748b; font-size: 0.75rem; }
+  .message {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.4s;
+  }
+  .message.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .msg-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+  .msg-avatar.user { background: #312e81; }
+  .msg-avatar.ai { background: #0f2f23; }
+  .msg-avatar.tool { background: #7c1d1d; }
+  .msg-bubble {
+    background: #111827;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    flex: 1;
+    border-left: 3px solid #1f2937;
+  }
+  .message.user .msg-bubble { border-left-color: #4f46e5; }
+  .message.ai .msg-bubble { border-left-color: #059669; }
+  .message.tool .msg-bubble { border-left-color: #dc2626; font-family: monospace; color: #fca5a5; }
+  .tool-tag {
+    display: inline-block;
+    background: #7c3aed22;
+    color: #a78bfa;
+    border: 1px solid #7c3aed44;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.72rem;
+    margin-right: 4px;
+    margin-bottom: 2px;
+  }
+  .scenario-select {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .progress-bar {
+    height: 4px;
+    background: #1f2937;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed, #4f46e5);
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+</style>
+</head>
+<body>
+
+<h1>🤖 Claudeエージェント設計パターン</h1>
+<p class="subtitle">3つのパターンをインタラクティブに体験する</p>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">📋 パターン1: タスク分解</div>
+  <div class="tab" onclick="switchTab(1)">🔄 パターン2: ループ制御</div>
+  <div class="tab" onclick="switchTab(2)">🔧 パターン3: ツール連携</div>
+</div>
+
+<!-- Pattern 1: Task Decomposition -->
+<div class="demo-area active" id="demo-0">
+  <div class="decomp-container">
+    <div class="input-panel">
+      <div class="panel-title">📥 大きなタスクを入力</div>
+      <textarea class="task-input" id="task-input" placeholder="例: 新商品のローンチ計画を立てて、マーケティング資料を作成し、SNSキャンペーンも設計してください">新商品のローンチ計画を立てて、競合分析・マーケティング資料作成・SNSキャンペーン設計まで一括でやってください</textarea>
+      <button class="run-btn" id="decomp-btn" onclick="runDecompose()">🧩 タスクを分解する</button>
+    </div>
+    <div class="output-panel">
+      <div class="panel-title">📤 エージェントの分解結果</div>
+      <ul class="subtask-list" id="subtask-list">
+        <div style="color:#475569;font-size:0.85rem;text-align:center;padding:40px 0">ボタンを押してタスクを分解</div>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Pattern 2: Loop Control -->
+<div class="demo-area" id="demo-1">
+  <div class="loop-viz">
+    <div class="loop-steps">
+      <div class="panel-title">🔄 ループステップ</div>
+      <div class="step-item" id="step-0">
+        <span class="step-icon">🎯</span>
+        <span class="step-label">目標設定</span>
+      </div>
+      <div class="step-item" id="step-1">
+        <span class="step-icon">⚡</span>
+        <span class="step-label">アクション実行</span>
+      </div>
+      <div class="step-item" id="step-2">
+        <span class="step-icon">📊</span>
+        <span class="step-label">結果評価</span>
+      </div>
+      <div class="step-item" id="step-3">
+        <span class="step-icon">🔍</span>
+        <span class="step-label">完了チェック</span>
+      </div>
+      <div class="step-item" id="step-4">
+        <span class="step-icon">✅</span>
+        <span class="step-label">完了 or 再試行</span>
+      </div>
+    </div>
+    <div>
+      <div class="progress-bar"><div class="progress-fill" id="loop-progress"></div></div>
+      <div class="loop-log" id="loop-log">
+        <span style="color:#475569">▶ 「スタート」ボタンを押してエージェントループを開始</span>
+      </div>
+    </div>
+    <div class="loop-controls">
+      <button class="ctrl-btn primary" id="loop-start-btn" onclick="startLoop()">▶ スタート</button>
+      <button class="ctrl-btn" onclick="resetLoop()">↺ リセット</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pattern 3: Tool Integration -->
+<div class="demo-area" id="demo-2">
+  <div class="tool-flow">
+    <div class="conversation-panel">
+      <div class="panel-title">💬 エージェントの思考と行動</div>
+      <select class="scenario-select" id="scenario-select">
+        <option value="0">シナリオ1: Webリサーチタスク</option>
+        <option value="1">シナリオ2: コード生成&実行タスク</option>
+        <option value="2">シナリオ3: データ分析タスク</option>
+      </select>
+      <div id="conversation-log">
+        <div style="color:#475569;font-size:0.85rem;text-align:center;padding:30px 0">シナリオを選んで「実行」を押してください</div>
+      </div>
+      <button class="run-btn" onclick="runToolScenario()" id="tool-run-btn" style="margin-top:12px">🚀 シナリオを実行</button>
+    </div>
+    <div class="tools-panel">
+      <div class="panel-title">🛠 利用可能ツール</div>
+      <div class="tool-card" id="tool-search">
+        <div class="tool-name">🔍 web_search</div>
+        <div class="tool-desc">Web検索して情報取得</div>
+      </div>
+      <div class="tool-card" id="tool-code">
+        <div class="tool-name">💻 code_exec</div>
+        <div class="tool-desc">コードを実行して結果取得</div>
+      </div>
+      <div class="tool-card" id="tool-file">
+        <div class="tool-name">📁 file_write</div>
+        <div class="tool-desc">ファイルを作成・保存</div>
+      </div>
+      <div class="tool-card" id="tool-calc">
+        <div class="tool-name">🧮 calculator</div>
+        <div class="tool-desc">数値計算を実行</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Tab switching =====
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.demo-area').forEach((d,i) => d.classList.toggle('active', i===idx));
+}
+
+// ===== Pattern 1: Task Decomposition =====
+const SUBTASKS = [
+  ["市場調査・競合分析", "競合他社3社の製品・価格・マーケ戦略を調査"],
+  ["ポジショニング設計", "差別化ポイントとターゲット顧客層を定義"],
+  ["マーケティング資料作成", "製品紹介スライド・ランディングページコピーを生成"],
+  ["SNSキャンペーン設計", "各プラットフォーム向けコンテンツカレンダーを作成"],
+  ["ローンチスケジュール策定", "タイムライン・KPI・担当者分担を整理"],
+];
+
+async function runDecompose() {
+  const btn = document.getElementById('decomp-btn');
+  const list = document.getElementById('subtask-list');
+  btn.disabled = true;
+  btn.textContent = '⏳ 分解中...';
+  list.innerHTML = '';
+  for (let i = 0; i < SUBTASKS.length; i++) {
+    await sleep(500 + i * 150);
+    const li = document.createElement('li');
+    li.className = 'subtask-item';
+    li.innerHTML = `
+      <span class="subtask-num">${i+1}</span>
+      <span class="subtask-text"><strong>${SUBTASKS[i][0]}</strong><br><span style="color:#64748b;font-size:0.78rem">${SUBTASKS[i][1]}</span></span>
+      <span class="subtask-status">✓ 割当済</span>
+    `;
+    list.appendChild(li);
+    await sleep(50);
+    li.classList.add('show');
+  }
+  btn.disabled = false;
+  btn.textContent = '🧩 タスクを分解する';
+}
+
+// ===== Pattern 2: Loop Control =====
+let loopRunning = false;
+const LOOP_LOGS = [
+  { cls:'info',    text:'[目標設定] タスク: "競合分析レポートを作成する"', step:0 },
+  { cls:'muted',   text:'[目標設定] 成功基準: 3競合×5項目の比較表が完成', step:0 },
+  { cls:'info',    text:'[Action #1] web_search("競合A 製品特徴 2026")', step:1 },
+  { cls:'success', text:'[Result] 検索結果: 15件取得 → 重要情報3件抽出', step:2 },
+  { cls:'warn',    text:'[評価] 競合Bのデータが不足。継続が必要', step:3 },
+  { cls:'info',    text:'[Action #2] web_search("競合B pricing 2026")', step:1 },
+  { cls:'success', text:'[Result] 価格情報取得: スタータープラン $49/mo', step:2 },
+  { cls:'warn',    text:'[評価] 競合Cのデータがまだ不足。継続', step:3 },
+  { cls:'info',    text:'[Action #3] web_search("競合C market share")', step:1 },
+  { cls:'success', text:'[Result] マーケットシェア: 推定23%（2026 Q1）', step:2 },
+  { cls:'success', text:'[評価] 全データ収集完了。比較表を生成中...', step:3 },
+  { cls:'success', text:'[完了] ✅ 3社×5項目の競合分析レポート生成完了！', step:4 },
+];
+
+async function startLoop() {
+  if (loopRunning) return;
+  loopRunning = true;
+  const btn = document.getElementById('loop-start-btn');
+  btn.disabled = true;
+  const log = document.getElementById('loop-log');
+  log.innerHTML = '';
+  document.querySelectorAll('.step-item').forEach(s => s.className='step-item');
+
+  for (let i = 0; i < LOOP_LOGS.length; i++) {
+    const l = LOOP_LOGS[i];
+    await sleep(600);
+    document.querySelectorAll('.step-item').forEach((s,idx) => {
+      if (idx < l.step) s.className='step-item done';
+      else if (idx === l.step) s.className='step-item current';
+      else s.className='step-item';
+    });
+    const div = document.createElement('div');
+    div.className = `log-line ${l.cls}`;
+    div.textContent = l.text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    const progress = Math.round(((i+1)/LOOP_LOGS.length)*100);
+    document.getElementById('loop-progress').style.width = progress+'%';
+  }
+  document.querySelectorAll('.step-item').forEach(s => s.className='step-item done');
+  loopRunning = false;
+  btn.disabled = false;
+}
+
+function resetLoop() {
+  loopRunning = false;
+  document.getElementById('loop-log').innerHTML = '<span style="color:#475569">▶ 「スタート」ボタンを押してエージェントループを開始</span>';
+  document.getElementById('loop-progress').style.width = '0%';
+  document.querySelectorAll('.step-item').forEach(s => s.className='step-item');
+  document.getElementById('loop-start-btn').disabled = false;
+}
+
+// ===== Pattern 3: Tool Integration =====
+const SCENARIOS = [
+  {
+    tools: ['tool-search', 'tool-file'],
+    messages: [
+      { role:'user',  text:'2026年のAI市場トレンドについてリサーチしてレポートにまとめて'},
+      { role:'ai',    text:'承知しました。まずWeb検索でAI市場の最新情報を収集します。', tags:[] },
+      { role:'tool',  text:'tool_call: web_search({ query: "AI market trends 2026", num_results: 5 })\n→ 結果: 5件取得 / AGI関連$320B市場, エージェントAI急成長...', tags:['web_search'] },
+      { role:'ai',    text:'検索結果を取得しました。追加でエージェントAI市場の規模も調べます。', tags:[] },
+      { role:'tool',  text:'tool_call: web_search({ query: "agentic AI market size 2026 forecast" })\n→ 結果: $47B規模 / CAGR 38%予測...', tags:['web_search'] },
+      { role:'ai',    text:'十分なデータが集まりました。レポートファイルを生成します。', tags:[] },
+      { role:'tool',  text:'tool_call: file_write({ path: "ai_trends_2026.md", content: "# AI市場トレンド2026..." })\n→ ✅ ファイル保存完了 (2,340文字)', tags:['file_write'] },
+      { role:'ai',    text:'✅ レポート完成！「ai_trends_2026.md」に保存しました。AGI市場$320B・エージェントAI$47Bが主要トレンドです。', tags:[] },
+    ]
+  },
+  {
+    tools: ['tool-code', 'tool-file'],
+    messages: [
+      { role:'user',  text:'Pythonでフィボナッチ数列を生成するコードを書いて、実行結果も見せて'},
+      { role:'ai',    text:'フィボナッチ数列生成コードを作成し、実際に実行して確認します。', tags:[] },
+      { role:'tool',  text:'tool_call: code_exec({ lang: "python", code: "def fib(n):\\n  a,b=0,1\\n  for _ in range(n): yield a; a,b=b,a+b\\nprint(list(fib(10)))" })\n→ 実行結果: [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]', tags:['code_exec'] },
+      { role:'ai',    text:'正常に動作しています。次にメモ化版も実装して性能比較します。', tags:[] },
+      { role:'tool',  text:'tool_call: code_exec({ lang: "python", code: "from functools import lru_cache\\n@lru_cache\\ndef fib(n): return n if n<2 else fib(n-1)+fib(n-2)\\nprint([fib(i) for i in range(10)])" })\n→ 実行結果: [0, 1, 1, 2, 3, 5, 8, 13, 21, 34] (3.2x高速)', tags:['code_exec'] },
+      { role:'ai',    text:'✅ 両バージョン完成。メモ化版は3.2倍高速です。コードをファイルに保存しますか？', tags:[] },
+    ]
+  },
+  {
+    tools: ['tool-calc', 'tool-code', 'tool-file'],
+    messages: [
+      { role:'user',  text:'売上データ[1200,1450,1380,1620,1750]の統計分析をして'},
+      { role:'ai',    text:'売上データの統計分析を行います。まず基本統計量を計算します。', tags:[] },
+      { role:'tool',  text:'tool_call: calculator({ operation: "stats", data: [1200,1450,1380,1620,1750] })\n→ 平均:1480 / 中央値:1450 / 標準偏差:201.5', tags:['calculator'] },
+      { role:'ai',    text:'基本統計を取得。次に成長率トレンドを分析します。', tags:[] },
+      { role:'tool',  text:'tool_call: code_exec({ lang: "python", code: "data=[1200,1450,1380,1620,1750]\\ngrowth=[(data[i]-data[i-1])/data[i-1]*100 for i in range(1,len(data))]\\nprint([round(g,1) for g in growth])" })\n→ 成長率: [+20.8%, -4.8%, +17.4%, +8.0%]', tags:['code_exec'] },
+      { role:'ai',    text:'分析完了。レポートとして保存します。', tags:[] },
+      { role:'tool',  text:'tool_call: file_write({ path: "sales_analysis.md", content: "# 売上分析\\n平均:1480万\\nトレンド:上昇傾向..." })\n→ ✅ 保存完了', tags:['file_write'] },
+      { role:'ai',    text:'✅ 分析完了！平均1,480万円・全体トレンドは上昇傾向。詳細は「sales_analysis.md」をご確認ください。', tags:[] },
+    ]
+  }
+];
+
+async function runToolScenario() {
+  const idx = parseInt(document.getElementById('scenario-select').value);
+  const sc = SCENARIOS[idx];
+  const btn = document.getElementById('tool-run-btn');
+  btn.disabled = true;
+  document.getElementById('conversation-log').innerHTML = '';
+  document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+
+  for (const msg of sc.messages) {
+    await sleep(700);
+    if (msg.tags && msg.tags.length > 0) {
+      msg.tags.forEach(t => {
+        const el = document.getElementById(t);
+        if (el) {
+          el.classList.add('active');
+          setTimeout(() => el.classList.remove('active'), 1500);
+        }
+      });
+    }
+    const div = document.createElement('div');
+    div.className = `message ${msg.role}`;
+    const avatars = { user:'👤', ai:'🤖', tool:'⚡' };
+    const tagHtml = (msg.tags||[]).map(t => `<span class="tool-tag">${t}</span>`).join('');
+    div.innerHTML = `
+      <div class="msg-avatar ${msg.role}">${avatars[msg.role]}</div>
+      <div class="msg-bubble">${tagHtml ? tagHtml+'<br>' : ''}${escHtml(msg.text)}</div>
+    `;
+    document.getElementById('conversation-log').appendChild(div);
+    await sleep(50);
+    div.classList.add('show');
+    document.getElementById('conversation-log').scrollTop = 99999;
+  }
+  btn.disabled = false;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
