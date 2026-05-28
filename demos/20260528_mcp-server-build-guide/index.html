@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCPサーバー シミュレーター</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: linear-gradient(135deg, #1a1f2e 0%, #162032 100%);
+      border-bottom: 1px solid #2d3748;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; color: #e2e8f0; letter-spacing: 0.02em; }
+    .badge {
+      background: #2563eb;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+    }
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      flex: 1;
+      overflow: hidden;
+    }
+    .arch-bar {
+      grid-column: 1 / -1;
+      background: #151922;
+      border-bottom: 1px solid #2d3748;
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #718096;
+    }
+    .arch-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1e2535;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #a0aec0;
+    }
+    .arch-node .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-blue { background: #3b82f6; }
+    .dot-purple { background: #8b5cf6; }
+    .dot-green { background: #10b981; }
+    .arch-arrow { color: #4a5568; font-size: 16px; }
+    .panel {
+      border-right: 1px solid #1e2535;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel:last-child { border-right: none; }
+    .panel-header {
+      padding: 12px 18px;
+      background: #151922;
+      border-bottom: 1px solid #1e2535;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-header h2 { font-size: 13px; font-weight: 700; color: #a0aec0; letter-spacing: 0.04em; text-transform: uppercase; }
+    .panel-icon { font-size: 16px; }
+    .panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+    /* Tool selector */
+    .tool-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+    .tool-card {
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .tool-card:hover { border-color: #3b82f6; background: #1e2a42; }
+    .tool-card.active { border-color: #3b82f6; background: #1e2a42; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+    .tool-name { font-size: 13px; font-weight: 700; color: #60a5fa; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .tool-desc { font-size: 11px; color: #718096; line-height: 1.5; }
+    .tool-params { margin-top: 8px; }
+    .param-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .param-label { font-size: 11px; color: #9ca3af; min-width: 80px; }
+    .param-input {
+      flex: 1;
+      background: #0f1117;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 12px;
+      padding: 5px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .param-input:focus { border-color: #3b82f6; }
+    .run-btn {
+      width: 100%;
+      margin-top: 14px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s;
+      letter-spacing: 0.02em;
+    }
+    .run-btn:hover { background: linear-gradient(135deg, #3b82f6, #2563eb); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
+    .run-btn:active { transform: translateY(0); }
+    /* Protocol panel */
+    .msg-list { display: flex; flex-direction: column; gap: 8px; }
+    .msg-item {
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      line-height: 1.6;
+      border-left: 3px solid transparent;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .msg-req { background: #1a2342; border-color: #3b82f6; color: #93c5fd; }
+    .msg-res { background: #1a3030; border-color: #10b981; color: #6ee7b7; }
+    .msg-err { background: #2d1515; border-color: #ef4444; color: #fca5a5; }
+    .msg-info { background: #1e2535; border-color: #6b7280; color: #9ca3af; }
+    .msg-dir { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.7; margin-bottom: 4px; font-family: inherit; }
+    .msg-body { white-space: pre-wrap; word-break: break-all; }
+    /* Output panel */
+    .output-area {
+      background: #0d1117;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      min-height: 120px;
+      color: #a0aec0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.7;
+    }
+    .output-label { font-size: 11px; font-weight: 700; color: #4a5568; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-top: 12px;
+    }
+    .status-ok { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+    .status-err { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+    .status-wait { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+    .stats-row { display: flex; gap: 10px; margin-top: 16px; }
+    .stat-card {
+      flex: 1;
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-val { font-size: 20px; font-weight: 800; color: #60a5fa; }
+    .stat-lbl { font-size: 10px; color: #718096; margin-top: 2px; letter-spacing: 0.04em; }
+    .code-block {
+      background: #0d1117;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      color: #a0aec0;
+      white-space: pre;
+      overflow-x: auto;
+      margin-top: 12px;
+      line-height: 1.65;
+    }
+    .kw { color: #c084fc; }
+    .str { color: #86efac; }
+    .fn { color: #60a5fa; }
+    .cm { color: #4a5568; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 2px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>🔌 MCPサーバー シミュレーター</h1>
+  <span class="badge">上級編デモ</span>
+  <span style="margin-left:auto;font-size:12px;color:#4a5568;">Model Context Protocol — ツール連携の仕組みを体験</span>
+</header>
+
+<div class="main">
+  <div class="arch-bar">
+    <span style="color:#718096;font-weight:600;margin-right:8px;">アーキテクチャ:</span>
+    <div class="arch-node"><span class="dot dot-blue"></span>Claude (LLM)</div>
+    <span class="arch-arrow">⇄</span>
+    <div class="arch-node"><span class="dot dot-purple"></span>MCPクライアント</div>
+    <span class="arch-arrow">⇄</span>
+    <div class="arch-node"><span class="dot dot-green"></span>MCPサーバー (あなたが作る)</div>
+    <span class="arch-arrow">⇄</span>
+    <div class="arch-node" style="color:#9ca3af;">外部ツール / DB / API</div>
+  </div>
+
+  <!-- Left: Tool Runner -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-icon">🛠️</span>
+      <h2>ツール実行</h2>
+    </div>
+    <div class="panel-body">
+      <div class="tool-grid" id="toolGrid">
+        <div class="tool-card active" data-tool="readFile" onclick="selectTool(this)">
+          <div class="tool-name">📂 read_file</div>
+          <div class="tool-desc">ローカルファイルの内容をClaudeへ渡すツール</div>
+          <div class="tool-params">
+            <div class="param-row">
+              <span class="param-label">path</span>
+              <input class="param-input" id="p-readFile-path" value="/data/config.json" placeholder="ファイルパス">
+            </div>
+          </div>
+        </div>
+        <div class="tool-card" data-tool="searchWeb" onclick="selectTool(this)">
+          <div class="tool-name">🌐 web_search</div>
+          <div class="tool-desc">Web検索結果をClaudeへフィードするツール</div>
+          <div class="tool-params">
+            <div class="param-row">
+              <span class="param-label">query</span>
+              <input class="param-input" id="p-searchWeb-query" value="Claude MCP 2025" placeholder="検索クエリ">
+            </div>
+          </div>
+        </div>
+        <div class="tool-card" data-tool="runSql" onclick="selectTool(this)">
+          <div class="tool-name">🗄️ run_sql</div>
+          <div class="tool-desc">データベースクエリを実行して結果を返すツール</div>
+          <div class="tool-params">
+            <div class="param-row">
+              <span class="param-label">query</span>
+              <input class="param-input" id="p-runSql-query" value="SELECT * FROM users LIMIT 5" placeholder="SQL文">
+            </div>
+          </div>
+        </div>
+        <div class="tool-card" data-tool="sendSlack" onclick="selectTool(this)">
+          <div class="tool-name">💬 slack_post</div>
+          <div class="tool-desc">Slackチャンネルにメッセージをポストするツール</div>
+          <div class="tool-params">
+            <div class="param-row">
+              <span class="param-label">channel</span>
+              <input class="param-input" id="p-sendSlack-channel" value="#general" placeholder="チャンネル名">
+            </div>
+            <div class="param-row">
+              <span class="param-label">message</span>
+              <input class="param-input" id="p-sendSlack-message" value="デプロイ完了しました 🎉" placeholder="メッセージ">
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="run-btn" onclick="runTool()">▶ ツールを実行する</button>
+    </div>
+  </div>
+
+  <!-- Center: Protocol log -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-icon">📡</span>
+      <h2>プロトコルログ</h2>
+    </div>
+    <div class="panel-body">
+      <div class="msg-list" id="msgList">
+        <div class="msg-item msg-info">
+          <div class="msg-dir">SYSTEM</div>
+          <div class="msg-body">MCPサーバー起動中...
+stdio トランスポート: 接続待機
+登録ツール: 4 件</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Result + Code -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-icon">📦</span>
+      <h2>レスポンス / 実装コード</h2>
+    </div>
+    <div class="panel-body">
+      <div class="output-label">ツール実行結果</div>
+      <div class="output-area" id="outputArea">ツールを選択して「実行」ボタンを押してください。</div>
+      <div id="statusChip" class="status-chip status-wait">● 待機中</div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-val" id="statCalls">0</div><div class="stat-lbl">呼び出し回数</div></div>
+        <div class="stat-card"><div class="stat-val" id="statLatency">—</div><div class="stat-lbl">レイテンシ(ms)</div></div>
+        <div class="stat-card"><div class="stat-val" id="statTokens">0</div><div class="stat-lbl">トークン消費</div></div>
+      </div>
+      <div class="output-label" style="margin-top:18px;">実装サンプル (Python SDK)</div>
+      <div class="code-block" id="codeBlock"><span class="cm"># ツールを選択すると実装コードが表示されます</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const tools = {
+  readFile: {
+    name: 'read_file',
+    schema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+    simulate: (p) => {
+      const content = p.path.endsWith('.json')
+        ? `{\n  "api_key": "sk-...",\n  "model": "claude-sonnet-4-6",\n  "max_tokens": 4096\n}`
+        : `# Config\nversion: 1.0\nenabled: true`;
+      return { content: [{ type: 'text', text: content }] };
+    },
+    code: `<span class="kw">from</span> mcp.server <span class="kw">import</span> Server
+<span class="kw">from</span> mcp.types <span class="kw">import</span> Tool, TextContent
+
+app = <span class="fn">Server</span>(<span class="str">"my-mcp-server"</span>)
+
+<span class="cm"># ツール定義を登録</span>
+@app.<span class="fn">list_tools</span>()
+<span class="kw">async def</span> <span class="fn">list_tools</span>():
+    <span class="kw">return</span> [<span class="fn">Tool</span>(
+        name=<span class="str">"read_file"</span>,
+        description=<span class="str">"ファイルを読み込む"</span>,
+        inputSchema={
+            <span class="str">"type"</span>: <span class="str">"object"</span>,
+            <span class="str">"properties"</span>: {
+                <span class="str">"path"</span>: {<span class="str">"type"</span>: <span class="str">"string"</span>}
+            }
+        }
+    )]
+
+<span class="cm"># ツール実行ハンドラ</span>
+@app.<span class="fn">call_tool</span>()
+<span class="kw">async def</span> <span class="fn">call_tool</span>(name, arguments):
+    <span class="kw">if</span> name == <span class="str">"read_file"</span>:
+        path = arguments[<span class="str">"path"</span>]
+        content = <span class="fn">open</span>(path).<span class="fn">read</span>()
+        <span class="kw">return</span> [<span class="fn">TextContent</span>(
+            type=<span class="str">"text"</span>, text=content
+        )]`
+  },
+  searchWeb: {
+    name: 'web_search',
+    schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+    simulate: (p) => ({
+      content: [{ type: 'text', text: `検索結果: "${p.query}"\n\n1. Anthropic、Model Context Protocol を正式公開 (2024-11)\n   → MCPはLLMとツールを繋ぐオープン標準規格\n\n2. Claude + MCP で自律エージェントを構築する方法 (2025-03)\n   → stdioとSSEの2つのトランスポートをサポート\n\n3. MCP サーバー実装集 (GitHub)\n   → コミュニティ製サーバーが300件以上公開中` }]
+    }),
+    code: `<span class="kw">import</span> httpx
+<span class="kw">from</span> mcp.server <span class="kw">import</span> Server
+
+app = <span class="fn">Server</span>(<span class="str">"web-search-server"</span>)
+
+@app.<span class="fn">call_tool</span>()
+<span class="kw">async def</span> <span class="fn">call_tool</span>(name, arguments):
+    <span class="kw">if</span> name == <span class="str">"web_search"</span>:
+        query = arguments[<span class="str">"query"</span>]
+
+        <span class="cm"># 検索 API を呼び出す</span>
+        <span class="kw">async with</span> httpx.<span class="fn">AsyncClient</span>() <span class="kw">as</span> client:
+            res = <span class="kw">await</span> client.<span class="fn">get</span>(
+                <span class="str">"https://api.search.example/v1"</span>,
+                params={<span class="str">"q"</span>: query, <span class="str">"limit"</span>: 5}
+            )
+            results = res.<span class="fn">json</span>()[<span class="str">"items"</span>]
+
+        text = <span class="str">"\n"</span>.<span class="fn">join</span>(
+            <span class="fn">f</span><span class="str">"{i+1}. {r['title']}\n   {r['snippet']}"</span>
+            <span class="kw">for</span> i, r <span class="kw">in</span> <span class="fn">enumerate</span>(results)
+        )
+        <span class="kw">return</span> [<span class="fn">TextContent</span>(type=<span class="str">"text"</span>, text=text)]`
+  },
+  runSql: {
+    name: 'run_sql',
+    schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+    simulate: (p) => {
+      const isSelect = p.query.trim().toUpperCase().startsWith('SELECT');
+      if (!isSelect) return { isError: true, content: [{ type: 'text', text: 'エラー: SELECT文のみ許可されています（安全のため）' }] };
+      return { content: [{ type: 'text', text: `クエリ実行完了: ${p.query}\n\n結果 (5行):\nid | name       | email                  | created_at\n---|------------|------------------------|------------\n1  | 山田太郎   | taro@example.com       | 2025-01-10\n2  | 鈴木花子   | hanako@example.com     | 2025-01-12\n3  | 田中次郎   | jiro@example.com       | 2025-02-03\n4  | 佐藤美咲   | misaki@example.com     | 2025-02-15\n5  | 高橋健     | ken@example.com        | 2025-03-01` }] };
+    },
+    code: `<span class="kw">import</span> sqlite3
+<span class="kw">from</span> mcp.server <span class="kw">import</span> Server
+
+app = <span class="fn">Server</span>(<span class="str">"database-server"</span>)
+DB_PATH = <span class="str">"./app.db"</span>
+
+@app.<span class="fn">call_tool</span>()
+<span class="kw">async def</span> <span class="fn">call_tool</span>(name, arguments):
+    <span class="kw">if</span> name == <span class="str">"run_sql"</span>:
+        sql = arguments[<span class="str">"query"</span>]
+
+        <span class="cm"># SELECT のみ許可（安全対策）</span>
+        <span class="kw">if not</span> sql.strip().<span class="fn">upper</span>().<span class="fn">startswith</span>(<span class="str">"SELECT"</span>):
+            <span class="kw">raise</span> <span class="fn">ValueError</span>(<span class="str">"SELECT のみ許可"</span>)
+
+        conn = sqlite3.<span class="fn">connect</span>(DB_PATH)
+        cursor = conn.<span class="fn">execute</span>(sql)
+        rows = cursor.<span class="fn">fetchall</span>()
+        cols = [d[0] <span class="kw">for</span> d <span class="kw">in</span> cursor.description]
+
+        <span class="cm"># テーブル形式に整形</span>
+        lines = [<span class="str">" | "</span>.<span class="fn">join</span>(cols)]
+        lines += [<span class="str">" | "</span>.<span class="fn">join</span>(<span class="fn">str</span>(v) <span class="kw">for</span> v <span class="kw">in</span> row) <span class="kw">for</span> row <span class="kw">in</span> rows]
+        <span class="kw">return</span> [<span class="fn">TextContent</span>(type=<span class="str">"text"</span>, text=<span class="str">"\n"</span>.<span class="fn">join</span>(lines))]`
+  },
+  sendSlack: {
+    name: 'slack_post',
+    schema: { type: 'object', properties: { channel: { type: 'string' }, message: { type: 'string' } }, required: ['channel', 'message'] },
+    simulate: (p) => ({
+      content: [{ type: 'text', text: `✅ Slackメッセージ送信完了\nチャンネル: ${p.channel}\nメッセージ: "${p.message}"\ntimestamp: ${Date.now()}\nメッセージID: msg-${Math.random().toString(36).slice(2,10)}` }]
+    }),
+    code: `<span class="kw">import</span> os
+<span class="kw">from</span> slack_sdk.web.async_client <span class="kw">import</span> AsyncWebClient
+<span class="kw">from</span> mcp.server <span class="kw">import</span> Server
+
+app = <span class="fn">Server</span>(<span class="str">"slack-server"</span>)
+slack = <span class="fn">AsyncWebClient</span>(token=os.environ[<span class="str">"SLACK_BOT_TOKEN"</span>])
+
+@app.<span class="fn">call_tool</span>()
+<span class="kw">async def</span> <span class="fn">call_tool</span>(name, arguments):
+    <span class="kw">if</span> name == <span class="str">"slack_post"</span>:
+        channel = arguments[<span class="str">"channel"</span>]
+        message = arguments[<span class="str">"message"</span>]
+
+        res = <span class="kw">await</span> slack.chat_postMessage(
+            channel=channel,
+            text=message
+        )
+
+        <span class="kw">return</span> [<span class="fn">TextContent</span>(
+            type=<span class="str">"text"</span>,
+            text=<span class="fn">f</span><span class="str">"送信完了: ts={res['ts']}"</span>
+        )]`
+  }
+};
+
+let selected = 'readFile';
+let callCount = 0;
+
+function selectTool(el) {
+  document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selected = el.dataset.tool;
+}
+
+function addMsg(type, dir, body) {
+  const list = document.getElementById('msgList');
+  const item = document.createElement('div');
+  item.className = `msg-item msg-${type}`;
+  item.innerHTML = `<div class="msg-dir">${dir}</div><div class="msg-body">${escHtml(body)}</div>`;
+  list.appendChild(item);
+  list.scrollTop = list.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function getParams() {
+  const t = selected;
+  if (t === 'readFile') return { path: document.getElementById('p-readFile-path').value };
+  if (t === 'searchWeb') return { query: document.getElementById('p-searchWeb-query').value };
+  if (t === 'runSql') return { query: document.getElementById('p-runSql-query').value };
+  if (t === 'sendSlack') return { channel: document.getElementById('p-sendSlack-channel').value, message: document.getElementById('p-sendSlack-message').value };
+}
+
+async function runTool() {
+  const tool = tools[selected];
+  const params = getParams();
+  const start = Date.now();
+
+  // Request log
+  const reqJson = JSON.stringify({ jsonrpc: '2.0', method: 'tools/call', params: { name: tool.name, arguments: params }, id: callCount + 1 }, null, 2);
+  addMsg('req', '→ CLAUDE → MCP SERVER', reqJson);
+
+  // Simulate latency
+  await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
+
+  const result = tool.simulate(params);
+  const latency = Date.now() - start;
+  callCount++;
+
+  const isErr = result.isError;
+  const resJson = JSON.stringify({ jsonrpc: '2.0', result, id: callCount }, null, 2);
+  addMsg(isErr ? 'err' : 'res', '← MCP SERVER → CLAUDE', resJson);
+
+  // Update output
+  const out = result.content[0].text;
+  document.getElementById('outputArea').textContent = out;
+
+  // Status
+  const chip = document.getElementById('statusChip');
+  chip.className = `status-chip ${isErr ? 'status-err' : 'status-ok'}`;
+  chip.textContent = isErr ? '● エラー' : '● 成功';
+
+  // Stats
+  document.getElementById('statCalls').textContent = callCount;
+  document.getElementById('statLatency').textContent = latency;
+  document.getElementById('statTokens').textContent = Math.floor(out.length * 1.3);
+
+  // Code
+  document.getElementById('codeBlock').innerHTML = tool.code;
+}
+
+// Init code display
+document.getElementById('codeBlock').innerHTML = tools.readFile.code;
+</script>
+</body>
+</html>
