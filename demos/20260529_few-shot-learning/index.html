@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>Few-shot学習デモ：Claudeを例文で育てる</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    min-height: 800px;
+    color: #fff;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 6px;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 20px;
+  }
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,0.12);
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: rgba(167,139,250,0.5); }
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+  .badge-zero { background: #ef4444; }
+  .badge-one  { background: #f59e0b; }
+  .badge-few  { background: #10b981; }
+  .prompt-box {
+    background: rgba(0,0,0,0.35);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: #cbd5e1;
+    margin-bottom: 10px;
+    min-height: 90px;
+    white-space: pre-wrap;
+  }
+  .prompt-box .user-label {
+    color: #60a5fa;
+    font-weight: 700;
+    font-size: 10px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .prompt-box .example-label {
+    color: #a78bfa;
+    font-weight: 700;
+    font-size: 10px;
+    display: block;
+    margin-bottom: 3px;
+    margin-top: 6px;
+  }
+  .output-label {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .output-box {
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: #d1fae5;
+    min-height: 70px;
+  }
+  .output-box.bad { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.25); color: #fecaca; }
+  .output-box.ok  { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); color: #fef3c7; }
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .score-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar { height: 100%; border-radius: 3px; }
+  .score-label { font-size: 11px; color: #94a3b8; width: 60px; text-align: right; }
+  .interactive-section {
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 18px;
+    border: 1px solid rgba(167,139,250,0.3);
+  }
+  .interactive-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #c4b5fd;
+  }
+  .example-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .example-input-wrap label {
+    display: block;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .example-input-wrap textarea {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: #e2e8f0;
+    padding: 8px;
+    font-size: 11px;
+    resize: none;
+    height: 54px;
+    font-family: inherit;
+  }
+  .example-input-wrap textarea:focus { outline: none; border-color: #a78bfa; }
+  .run-btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(90deg, #7c3aed, #2563eb);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    margin-bottom: 12px;
+  }
+  .run-btn:hover { opacity: 0.85; }
+  .result-display {
+    background: rgba(0,0,0,0.35);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+    color: #d1fae5;
+    line-height: 1.7;
+    min-height: 56px;
+    border: 1px solid rgba(16,185,129,0.2);
+    white-space: pre-wrap;
+  }
+  .tip-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .tip {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    border-left: 3px solid #7c3aed;
+  }
+  .tip strong { color: #c4b5fd; display: block; margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<h1>Few-shot学習デモ：3つの例文でClaudeを「育てる」</h1>
+<p class="subtitle">Zero-shot / One-shot / Few-shot の違いをインタラクティブに体験</p>
+
+<div class="main-grid">
+  <!-- Zero-shot -->
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-zero">Zero-shot</span>
+      例文なし
+    </div>
+    <div class="prompt-box">
+<span class="user-label">👤 プロンプト</span>「新しいカフェがオープンした」というニュースを
+ポジティブなトーンで短くまとめてください。</div>
+    <div class="output-label">📤 Claudeの出力（例）</div>
+    <div class="output-box bad">新しいカフェがオープンしました。
+ぜひ足を運んでみてください。
+
+新鮮なコーヒーと居心地の良い空間が
+お待ちしています。</div>
+    <div class="score-row">
+      <span class="score-label">再現性</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:30%;background:#ef4444"></div></div>
+    </div>
+    <div class="score-row">
+      <span class="score-label">トーン一致</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:35%;background:#ef4444"></div></div>
+    </div>
+  </div>
+
+  <!-- One-shot -->
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-one">One-shot</span>
+      例文1つ
+    </div>
+    <div class="prompt-box">
+<span class="user-label">👤 プロンプト</span>以下の形式でニュースをまとめてください。
+
+<span class="example-label">📌 例：</span>入力:「公園で桜が満開」
+出力:「🌸 春の絶景が広がる！地元公園で
+桜が満開を迎え、多くの人が笑顔に✨」
+
+入力:「新しいカフェがオープンした」
+出力:</div>
+    <div class="output-label">📤 Claudeの出力（例）</div>
+    <div class="output-box ok">☕ 注目の新店舗が誕生！
+待望の新カフェがついにオープン、
+地域に新たな集いの場が登場✨</div>
+    <div class="score-row">
+      <span class="score-label">再現性</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:65%;background:#f59e0b"></div></div>
+    </div>
+    <div class="score-row">
+      <span class="score-label">トーン一致</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:70%;background:#f59e0b"></div></div>
+    </div>
+  </div>
+
+  <!-- Few-shot -->
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-few">Few-shot</span>
+      例文3つ
+    </div>
+    <div class="prompt-box">
+<span class="user-label">👤 プロンプト</span>以下の形式でニュースをまとめてください。
+
+<span class="example-label">📌 例1：</span>入力:「公園で桜が満開」
+出力:「🌸 春の絶景！桜が満開✨」
+<span class="example-label">📌 例2：</span>入力:「駅前に新図書館が完成」
+出力:「📚 知の殿堂が誕生！新図書館オープン🎉」
+<span class="example-label">📌 例3：</span>入力:「地元チームが優勝」
+出力:「🏆 快挙達成！地元の誇りが全国制覇🔥」
+
+入力:「新しいカフェがオープンした」
+出力:</div>
+    <div class="output-label">📤 Claudeの出力（例）</div>
+    <div class="output-box">☕ 新星誕生！待望の新カフェが
+ついにオープン🎊</div>
+    <div class="score-row">
+      <span class="score-label">再現性</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:92%;background:#10b981"></div></div>
+    </div>
+    <div class="score-row">
+      <span class="score-label">トーン一致</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:95%;background:#10b981"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Interactive Section -->
+<div class="interactive-section">
+  <div class="interactive-title">🧪 自分でFew-shotプロンプトを体験</div>
+  <div class="example-grid">
+    <div class="example-input-wrap">
+      <label>📌 例文1（入力 → 期待する出力）</label>
+      <textarea id="ex1" placeholder="例：ポジティブなニュース → 🎉 素晴らしいニュース！〇〇が実現✨">🌸 春の絶景！桜が満開✨</textarea>
+    </div>
+    <div class="example-input-wrap">
+      <label>📌 例文2</label>
+      <textarea id="ex2" placeholder="例：ネガティブなニュース → 😢 残念なお知らせ...〇〇が発覚">📚 知の殿堂が誕生！新図書館オープン🎉</textarea>
+    </div>
+    <div class="example-input-wrap">
+      <label>📌 例文3</label>
+      <textarea id="ex3" placeholder="例：中立なニュース → 📢 情報更新：〇〇について">🏆 快挙達成！地元の誇りが全国制覇🔥</textarea>
+    </div>
+    <div class="example-input-wrap">
+      <label>🎯 テストしたい入力</label>
+      <textarea id="testInput" placeholder="例：新しいカフェがオープンした">地域の子ども食堂に100万円の寄付が集まった</textarea>
+    </div>
+  </div>
+  <button class="run-btn" onclick="runFewShot()">▶ Few-shotプロンプトを生成して確認</button>
+  <div class="result-display" id="resultBox">← ボタンを押すと、Few-shotプロンプトの構造と期待される出力パターンが表示されます</div>
+  <div class="tip-row">
+    <div class="tip">
+      <strong>💡 例文の選び方</strong>
+      出力してほしいフォーマット・トーン・長さを例文で示す。
+      バラバラな例より一貫したスタイルの例を揃えるほど効果的。
+    </div>
+    <div class="tip">
+      <strong>⚡ 何例が最適？</strong>
+      3〜5例が最も安定。1例だと偶然一致する可能性、7例以上は
+      コンテキスト消費が増えコスパが下がる。
+    </div>
+    <div class="tip">
+      <strong>🔄 順番の影響</strong>
+      最後の例がClaudeに最も強く影響する（recency bias）。
+      最も伝えたいスタイルの例は最後に配置するのがコツ。
+    </div>
+  </div>
+</div>
+
+<script>
+function runFewShot() {
+  const ex1 = document.getElementById('ex1').value.trim();
+  const ex2 = document.getElementById('ex2').value.trim();
+  const ex3 = document.getElementById('ex3').value.trim();
+  const test = document.getElementById('testInput').value.trim();
+
+  const examplesText = [
+    ex1 ? `例1の出力パターン: "${ex1}"` : '',
+    ex2 ? `例2の出力パターン: "${ex2}"` : '',
+    ex3 ? `例3の出力パターン: "${ex3}"` : '',
+  ].filter(Boolean).join('\n');
+
+  // Analyze style from examples
+  const hasEmoji = [ex1, ex2, ex3].some(e => /[\u{1F300}-\u{1FFFF}]/u.test(e));
+  const avgLen = [ex1, ex2, ex3].filter(Boolean).reduce((a,b) => a + b.length, 0) / ([ex1,ex2,ex3].filter(Boolean).length || 1);
+  const hasExcl = [ex1, ex2, ex3].some(e => e.includes('！') || e.includes('!'));
+
+  // Simple pattern-based "simulated output"
+  let simulated = '';
+  if (test.includes('寄付') || test.includes('支援') || test.includes('助け')) {
+    simulated = hasEmoji ? '🙏 感動の支援！' + test.replace(/。$/, '') + (hasExcl ? '✨' : '') : test;
+  } else if (test.includes('カフェ') || test.includes('店')) {
+    simulated = hasEmoji ? '☕ 新星誕生！' + test.replace(/。$/, '') + (hasExcl ? '🎊' : '') : test;
+  } else {
+    const firstExample = ex1 || ex2 || ex3;
+    const emojiMatch = firstExample.match(/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}⭐🌟✨🎉🔥💡]/u);
+    const emoji = emojiMatch ? emojiMatch[0] : '';
+    simulated = emoji + ' ' + test.replace(/。$/, '') + (hasExcl && hasEmoji ? '✨' : '');
+  }
+
+  const result = `📋 生成されるFew-shotプロンプト構造：
+──────────────────────────────
+${examplesText}
+
+📝 テスト入力: "${test}"
+
+──────────────────────────────
+🤖 Claudeが学習するスタイル分析：
+  • 絵文字使用: ${hasEmoji ? 'あり（出力にも絵文字が含まれる）' : 'なし（テキストのみ）'}
+  • 平均出力長: 約${Math.round(avgLen)}文字
+  • 感嘆符の使用: ${hasExcl ? 'あり（エネルギッシュなトーン）' : 'なし（落ち着いたトーン）'}
+
+✅ 期待される出力パターン：
+  "${simulated}"
+
+💡 このプロンプトをClaudeに送ると、例文のスタイルを
+   学習して一貫したフォーマットで回答します。`;
+
+  document.getElementById('resultBox').textContent = result;
+}
+</script>
+</body>
+</html>
