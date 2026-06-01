@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatGPT vs Claude 比較デモ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    color: #fff;
+  }
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-align: center;
+    background: linear-gradient(90deg, #74ebd5, #9face6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    color: #a0a8c0;
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .tab {
+    padding: 8px 22px;
+    border-radius: 20px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.25s;
+  }
+  .tab.gpt { background: #10a37f22; border-color: #10a37f; color: #10a37f; }
+  .tab.gpt.active, .tab.gpt:hover { background: #10a37f; color: #fff; }
+  .tab.claude { background: #d97b3522; border-color: #d97b35; color: #d97b35; }
+  .tab.claude.active, .tab.claude:hover { background: #d97b35; color: #fff; }
+  .tab.compare { background: #7c6fe022; border-color: #7c6fe0; color: #7c6fe0; }
+  .tab.compare.active, .tab.compare:hover { background: #7c6fe0; color: #fff; }
+
+  .panel { display: none; width: 100%; max-width: 1100px; }
+  .panel.active { display: block; }
+
+  /* Compare table */
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+  }
+  .compare-table th {
+    padding: 12px 16px;
+    text-align: center;
+    font-size: 0.95rem;
+  }
+  .compare-table th:first-child { text-align: left; color: #a0a8c0; }
+  .th-gpt { color: #10a37f; }
+  .th-claude { color: #d97b35; }
+  .compare-table td {
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.06);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .compare-table tr td:first-child {
+    border-radius: 10px 0 0 10px;
+    font-weight: 600;
+    color: #d0d8f0;
+    width: 160px;
+  }
+  .compare-table tr td:last-child { border-radius: 0 10px 10px 0; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+  .badge-green { background: #10a37f33; color: #10a37f; }
+  .badge-orange { background: #d97b3533; color: #d97b35; }
+  .badge-blue { background: #4fa3e033; color: #4fa3e0; }
+  .badge-gray { background: #ffffff22; color: #a0a8c0; }
+
+  /* Prompt tester */
+  .tester-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .tester-box {
+    background: rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .tester-box h3 { font-size: 1rem; margin-bottom: 12px; }
+  .tester-box.gpt h3 { color: #10a37f; }
+  .tester-box.claude h3 { color: #d97b35; }
+  .scenario-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .scenario-btn {
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: #c0c8e0;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .scenario-btn:hover, .scenario-btn.active {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border-color: rgba(255,255,255,0.4);
+  }
+  .response-card {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 14px;
+    min-height: 160px;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: #d0d8f0;
+    border-left: 3px solid transparent;
+  }
+  .response-card.gpt { border-left-color: #10a37f; }
+  .response-card.claude { border-left-color: #d97b35; }
+  .response-label {
+    font-size: 0.72rem;
+    color: #a0a8c0;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .highlight { font-weight: 700; color: #fff; }
+  .score-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .score-item {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .score-label { font-size: 0.7rem; color: #a0a8c0; }
+  .score-val { font-size: 1.1rem; font-weight: 700; }
+
+  /* Use-case finder */
+  .usecase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .usecase-card {
+    background: rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all 0.25s;
+    border: 2px solid transparent;
+  }
+  .usecase-card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.2); }
+  .usecase-card.selected-gpt { border-color: #10a37f; background: #10a37f18; }
+  .usecase-card.selected-claude { border-color: #d97b35; background: #d97b3518; }
+  .usecase-icon { font-size: 1.8rem; margin-bottom: 8px; }
+  .usecase-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .usecase-desc { font-size: 0.78rem; color: #a0a8c0; line-height: 1.5; }
+  .verdict {
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    display: none;
+  }
+  .verdict.gpt { background: #10a37f18; border: 1px solid #10a37f55; }
+  .verdict.claude { background: #d97b3518; border: 1px solid #d97b3555; }
+  .verdict.active { display: block; }
+  .verdict-title { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+  .verdict.gpt .verdict-title { color: #10a37f; }
+  .verdict.claude .verdict-title { color: #d97b35; }
+</style>
+</head>
+<body>
+<h1>⚔️ ChatGPT vs Claude 徹底比較</h1>
+<p class="subtitle">実際のシーンで「どちらが向いているか」を体験できるインタラクティブガイド</p>
+
+<div class="tabs">
+  <button class="tab compare active" onclick="showPanel('compare')">📊 特徴比較表</button>
+  <button class="tab gpt" onclick="showPanel('tester')">💬 回答スタイル比較</button>
+  <button class="tab claude" onclick="showPanel('usecase')">🎯 用途別おすすめ</button>
+</div>
+
+<!-- Panel: Compare Table -->
+<div class="panel active" id="panel-compare">
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="th-gpt">🟢 ChatGPT</th>
+        <th class="th-claude">🟠 Claude</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>開発元</td>
+        <td>OpenAI（米）</td>
+        <td>Anthropic（米）</td>
+      </tr>
+      <tr>
+        <td>コンテキスト長</td>
+        <td><span class="badge badge-blue">最大128K tokens</span></td>
+        <td><span class="badge badge-orange">最大200K tokens</span> ★長文◎</td>
+      </tr>
+      <tr>
+        <td>日本語品質</td>
+        <td><span class="badge badge-green">高品質</span></td>
+        <td><span class="badge badge-orange">高品質＋自然な文体</span></td>
+      </tr>
+      <tr>
+        <td>画像入力</td>
+        <td><span class="badge badge-green">対応（GPT-4o）</span></td>
+        <td><span class="badge badge-green">対応（Claude 3+）</span></td>
+      </tr>
+      <tr>
+        <td>コード生成</td>
+        <td><span class="badge badge-green">得意</span></td>
+        <td><span class="badge badge-orange">得意（説明が詳しい）</span></td>
+      </tr>
+      <tr>
+        <td>安全性・倫理</td>
+        <td><span class="badge badge-blue">標準的</span></td>
+        <td><span class="badge badge-orange">Constitutional AI★</span></td>
+      </tr>
+      <tr>
+        <td>長文読み込み</td>
+        <td><span class="badge badge-blue">可（制限あり）</span></td>
+        <td><span class="badge badge-orange">書籍1冊を丸ごと処理可</span></td>
+      </tr>
+      <tr>
+        <td>プラグイン・連携</td>
+        <td><span class="badge badge-green">豊富（GPTs等）</span></td>
+        <td><span class="badge badge-blue">MCP対応・拡大中</span></td>
+      </tr>
+      <tr>
+        <td>文章の個性</td>
+        <td><span class="badge badge-blue">整然・情報重視</span></td>
+        <td><span class="badge badge-orange">自然・読みやすい文体</span></td>
+      </tr>
+      <tr>
+        <td>料金（無料枠）</td>
+        <td>GPT-3.5無料</td>
+        <td>Claude.ai無料プランあり</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Panel: Response Style Tester -->
+<div class="panel" id="panel-tester">
+  <div style="margin-bottom:12px;">
+    <p style="color:#a0a8c0; font-size:0.85rem; margin-bottom:8px;">シナリオを選択すると、それぞれのAIが返しそうな回答スタイルのサンプルを表示します</p>
+    <div class="scenario-btns">
+      <button class="scenario-btn active" onclick="setScenario(0, this)">📧 ビジネスメール</button>
+      <button class="scenario-btn" onclick="setScenario(1, this)">🔍 概念の説明</button>
+      <button class="scenario-btn" onclick="setScenario(2, this)">💻 コードのデバッグ</button>
+      <button class="scenario-btn" onclick="setScenario(3, this)">✍️ ブログ執筆支援</button>
+      <button class="scenario-btn" onclick="setScenario(4, this)">📊 データ分析相談</button>
+    </div>
+  </div>
+  <div class="tester-wrap">
+    <div class="tester-box gpt">
+      <h3>🟢 ChatGPTの回答スタイル</h3>
+      <div class="response-label">典型的な出力傾向</div>
+      <div class="response-card gpt" id="gpt-response">
+        プロンプト例を選択してください
+      </div>
+      <div class="score-row" id="gpt-scores"></div>
+    </div>
+    <div class="tester-box claude">
+      <h3>🟠 Claudeの回答スタイル</h3>
+      <div class="response-label">典型的な出力傾向</div>
+      <div class="response-card claude" id="claude-response">
+        プロンプト例を選択してください
+      </div>
+      <div class="score-row" id="claude-scores"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel: Use Case Finder -->
+<div class="panel" id="panel-usecase">
+  <p style="color:#a0a8c0; font-size:0.85rem; margin-bottom:14px; text-align:center;">あなたの用途をクリックすると、おすすめのAIと理由を表示します</p>
+  <div class="usecase-grid" id="usecase-grid">
+    <div class="usecase-card" onclick="selectUsecase(0, this)">
+      <div class="usecase-icon">📝</div>
+      <div class="usecase-title">長い文書の要約</div>
+      <div class="usecase-desc">報告書・論文・長文メールをまとめたい</div>
+    </div>
+    <div class="usecase-card" onclick="selectUsecase(1, this)">
+      <div class="usecase-icon">💻</div>
+      <div class="usecase-title">プログラミング補助</div>
+      <div class="usecase-desc">コード生成・デバッグ・説明</div>
+    </div>
+    <div class="usecase-card" onclick="selectUsecase(2, this)">
+      <div class="usecase-icon">✍️</div>
+      <div class="usecase-title">日本語文章作成</div>
+      <div class="usecase-desc">ブログ・メール・企画書の執筆</div>
+    </div>
+    <div class="usecase-card" onclick="selectUsecase(3, this)">
+      <div class="usecase-icon">🖼️</div>
+      <div class="usecase-title">画像の解析・説明</div>
+      <div class="usecase-desc">図表の読み取り・写真の説明</div>
+    </div>
+    <div class="usecase-card" onclick="selectUsecase(4, this)">
+      <div class="usecase-icon">🔌</div>
+      <div class="usecase-title">ツール・API連携</div>
+      <div class="usecase-desc">外部サービスと組み合わせて使いたい</div>
+    </div>
+    <div class="usecase-card" onclick="selectUsecase(5, this)">
+      <div class="usecase-icon">🤔</div>
+      <div class="usecase-title">複雑な論理的思考</div>
+      <div class="usecase-desc">難しい問題の分析・意思決定支援</div>
+    </div>
+  </div>
+  <div class="verdict gpt" id="verdict-gpt">
+    <div class="verdict-title">🟢 ChatGPT がおすすめ</div>
+    <div id="verdict-gpt-text"></div>
+  </div>
+  <div class="verdict claude" id="verdict-claude">
+    <div class="verdict-title">🟠 Claude がおすすめ</div>
+    <div id="verdict-claude-text"></div>
+  </div>
+</div>
+
+<script>
+const scenarios = [
+  {
+    label: '「〇〇社とのミーティング結果を上司に報告するメールを書いて」',
+    gpt: '<span class="highlight">件名：〇〇社ミーティング実施報告</span>\n\n田中部長\nお世話になっております。\n本日14時より実施した〇〇社とのミーティングについて、以下の通りご報告申し上げます。\n\n■ 議題：新製品導入の可否検討\n■ 先方出席：山田氏（営業部長）、鈴木氏（担当）\n■ 主な合意事項：来月末までに試用版を提供することで合意\n\n引き続き対応してまいります。\n何卒よろしくお願いいたします。',
+    gptScores: [{label:'形式の正確さ', val:'★★★★★', color:'#10a37f'}, {label:'個性・温かみ', val:'★★★', color:'#10a37f'}],
+    claude: '田中部長\n\nお疲れ様です。本日の〇〇社ミーティングについてご報告します。\n\n<span class="highlight">結論から申し上げると、来月末の試用版提供に合意しました。</span>\n先方は導入に前向きで、特に価格面と導入サポートへの関心が高かったです。次回までに料金プランの改訂案を準備する必要があります。\n\n詳細は添付の議事録をご確認ください。\nご指示があればすぐに対応いたします。',
+    claudeScores: [{label:'結論ファースト', val:'★★★★★', color:'#d97b35'}, {label:'自然な文体', val:'★★★★★', color:'#d97b35'}]
+  },
+  {
+    label: '「機械学習の過学習とは何か説明して」',
+    gpt: '<span class="highlight">過学習（Overfitting）とは</span>、モデルが訓練データに過度に適合しすぎて、新しいデータへの汎化性能が低下する現象です。\n\n主な原因：\n・モデルの複雑さが過剰\n・訓練データが不十分\n・特徴量が多すぎる\n\n対策：正則化、ドロップアウト、データ拡張、交差検証など。',
+    gptScores: [{label:'構造化・箇条書き', val:'★★★★★', color:'#10a37f'}, {label:'技術的正確さ', val:'★★★★★', color:'#10a37f'}],
+    claude: 'たとえば「試験の過去問だけ丸暗記した学生」を想像してください。過去問では満点が取れますが、本番の新問題には全然対応できない——これが過学習です。\n\n<span class="highlight">モデルが「答えを暗記」してしまい、「本質的なパターン」を学べていない状態です。</span>\n\n解決策のポイントは「汎化させること」。データを増やす、モデルをシンプルにする、正則化を使う、の3方向で考えると整理しやすいです。',
+    claudeScores: [{label:'アナロジーの豊富さ', val:'★★★★★', color:'#d97b35'}, {label:'直感的理解しやすさ', val:'★★★★★', color:'#d97b35'}]
+  },
+  {
+    label: '「このPythonコードのエラーを直して」',
+    gpt: '```python\n# 修正後のコード\ndef calculate_average(numbers):\n    if not numbers:  # 空リストのチェック追加\n        return 0\n    return sum(numbers) / len(numbers)\n```\n\n<span class="highlight">エラーの原因：空リストでlen()を0除算していました。</span>\nif not numbers でガード節を追加し、空の場合は0を返すよう修正しました。',
+    gptScores: [{label:'コードの正確さ', val:'★★★★★', color:'#10a37f'}, {label:'修正の簡潔さ', val:'★★★★★', color:'#10a37f'}],
+    claude: 'エラーの根本原因は「空リスト渡し時の ZeroDivisionError」ですね。\n\n```python\ndef calculate_average(numbers):\n    if not numbers:\n        return 0  # または None を返すか、例外を投げるかも検討を\n    return sum(numbers) / len(numbers)\n```\n\n<span class="highlight">補足：</span>0を返すか、Noneを返すか、例外を投げるかは用途次第です。「空=エラー」なのか「空=0」なのか、仕様を確認しておくといいです。',
+    claudeScores: [{label:'説明の丁寧さ', val:'★★★★★', color:'#d97b35'}, {label:'設計観点の提示', val:'★★★★', color:'#d97b35'}]
+  },
+  {
+    label: '「AIと働き方改革についてのブログ記事のアウトラインを作って」',
+    gpt: '<span class="highlight">タイトル案：AI時代の働き方改革：生産性を3倍にする実践ガイド</span>\n\n1. はじめに：AIが変える職場環境\n2. 主要な変化（5領域）\n   - 自動化できる業務\n   - 強化される業務\n3. 実践ステップ（段階別）\n4. 注意点・リスク\n5. まとめ',
+    gptScores: [{label:'構成の網羅性', val:'★★★★★', color:'#10a37f'}, {label:'SEO意識', val:'★★★★', color:'#10a37f'}],
+    claude: 'まず読者像を確認させてください——この記事は「AI初心者のビジネスパーソン」向けでしょうか？それとも「すでにAIを使っているマネジャー層」向けでしょうか？\n\nどちらかによってアウトラインが大きく変わります。\n\n<span class="highlight">【初心者向け案】</span> 入門→体験談→実践という導入重視の構成\n<span class="highlight">【実践者向け案】</span> 課題→解決策→ROI計算という問題解決型の構成\n\n読者像を教えていただければ、より刺さるアウトラインを作れます。',
+    claudeScores: [{label:'対話的なアプローチ', val:'★★★★★', color:'#d97b35'}, {label:'読者視点の深さ', val:'★★★★★', color:'#d97b35'}]
+  },
+  {
+    label: '「売上データのどこに問題があるか分析して」',
+    gpt: '<span class="highlight">売上データ分析の観点：</span>\n\n1. トレンド分析：前期比・前年比の変化\n2. セグメント別：地域・商品カテゴリ・顧客層\n3. 異常値検出：外れ値の特定\n4. 相関分析：売上に影響する変数の特定\n5. 予測モデル：将来の売上予測\n\n具体的なデータがあれば詳細分析が可能です。',
+    gptScores: [{label:'分析フレームの整理', val:'★★★★★', color:'#10a37f'}, {label:'体系的な提示', val:'★★★★★', color:'#10a37f'}],
+    claude: 'データを見る前に、「何が問題かがわからない」という点が実は重要なサインです。\n\n<span class="highlight">まず確認したい3つの問い：</span>\n① 売上は「絶対値で下がっている」か「成長率が鈍化している」か？\n② 問題を感じた「きっかけ」は何でしたか（会議での指摘？直感？）\n③ 過去に同様の問題が起きたことはありますか？\n\nこれによって「どこのデータから見るべきか」が決まります。具体的な数値があれば一緒に見ていきましょう。',
+    claudeScores: [{label:'本質的な問いかけ', val:'★★★★★', color:'#d97b35'}, {label:'伴走スタイル', val:'★★★★★', color:'#d97b35'}]
+  }
+];
+
+const usecases = [
+  { winner: 'claude', text: '長文読み込みはClaudeが圧倒的に有利です。コンテキストウィンドウが最大200K tokensあるため、書籍1冊や長大な仕様書をそのまま貼り付けて「第3章の結論をまとめて」と依頼できます。ChatGPTでは複数回に分けて貼り付ける必要があるシーンも、Claudeなら一発で処理できます。' },
+  { winner: 'both', text: 'プログラミング補助はどちらも高品質ですが、用途で使い分けましょう。<br>• <strong>ChatGPT</strong>：簡潔な修正・補完が得意。素早く答えてほしい時向き。<br>• <strong>Claude</strong>：「なぜこう書くか」の説明が丁寧。コードレビューや設計相談に向く。', winner: 'gpt' },
+  { winner: 'claude', text: '自然な日本語文章作成ではClaudeに軍配が上がります。Claudeは「読んでいて気持ちいい文体」を生成する傾向があり、ブログ・メール・企画書などの最終稿として使いやすい文章を出力します。ChatGPTは構造化が得意な反面、日本語がやや固くなりがちです。' },
+  { winner: 'both', text: '画像解析はどちらも対応しており性能差は小さいです。どちらのサービスも無料プランで試せます。細かいグラフ読み取りや複数画像の比較など、特殊な用途ではお試しいただいて確認することをお勧めします。', winner: 'gpt' },
+  { winner: 'gpt', text: '外部ツール・API連携は現時点でChatGPTが優位です。GPTs・Actions・プラグイン等のエコシステムが充実しており、多くのサービスがChatGPT連携に対応しています。一方ClaudeもMCPサーバーという強力な仕組みを持ち、開発者向けには急速に充実しつつあります。' },
+  { winner: 'claude', text: '複雑な論理的思考・長文の分析はClaudeが特に得意とする領域です。複雑な問いに対して前提を整理し、多角的な視点から丁寧に回答する傾向があります。Constitutional AI（憲法AI）という安全設計により、バランスの取れた意見が得られやすいのも特徴です。' }
+];
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  const tabMap = { compare: 'compare', tester: 'gpt', usecase: 'claude' };
+  document.querySelectorAll('.tab.' + tabMap[name])[0]?.classList.add('active');
+}
+
+function setScenario(idx, btn) {
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const s = scenarios[idx];
+  document.getElementById('gpt-response').innerHTML = s.gpt;
+  document.getElementById('claude-response').innerHTML = s.claude;
+  document.getElementById('gpt-scores').innerHTML = s.gptScores.map(sc =>
+    `<div class="score-item"><div class="score-label">${sc.label}</div><div class="score-val" style="color:${sc.color}">${sc.val}</div></div>`
+  ).join('');
+  document.getElementById('claude-scores').innerHTML = s.claudeScores.map(sc =>
+    `<div class="score-item"><div class="score-label">${sc.label}</div><div class="score-val" style="color:${sc.color}">${sc.val}</div></div>`
+  ).join('');
+}
+
+function selectUsecase(idx, el) {
+  document.querySelectorAll('.usecase-card').forEach(c => {
+    c.classList.remove('selected-gpt', 'selected-claude');
+  });
+  const u = usecases[idx];
+  el.classList.add('selected-' + u.winner);
+  document.getElementById('verdict-gpt').classList.remove('active');
+  document.getElementById('verdict-claude').classList.remove('active');
+  if (u.winner === 'gpt') {
+    document.getElementById('verdict-gpt-text').innerHTML = u.text;
+    document.getElementById('verdict-gpt').classList.add('active');
+  } else if (u.winner === 'claude') {
+    document.getElementById('verdict-claude-text').innerHTML = u.text;
+    document.getElementById('verdict-claude').classList.add('active');
+  } else {
+    document.getElementById('verdict-gpt-text').innerHTML = u.text;
+    document.getElementById('verdict-gpt').classList.add('active');
+  }
+}
+
+// Init first scenario
+setScenario(0, document.querySelector('.scenario-btn'));
+</script>
+</body>
+</html>
