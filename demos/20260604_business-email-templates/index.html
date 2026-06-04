@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudeメールテンプレート生成デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    background: linear-gradient(135deg, #f0f4ff 0%, #faf0ff 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .container {
+    width: 100%;
+    max-width: 1100px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  header h1 {
+    font-size: 26px;
+    font-weight: 800;
+    color: #2d2d6b;
+    margin-bottom: 8px;
+  }
+  header p {
+    color: #666;
+    font-size: 14px;
+  }
+  .badge {
+    display: inline-block;
+    background: linear-gradient(90deg, #6c63ff, #a78bfa);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .panel {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(108,99,255,0.10);
+    overflow: hidden;
+  }
+  .panel-header {
+    background: linear-gradient(90deg, #6c63ff, #a78bfa);
+    color: white;
+    padding: 14px 20px;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .template-list {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .template-btn {
+    background: #f8f7ff;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  .template-btn:hover {
+    border-color: #a78bfa;
+    background: #f0ebff;
+  }
+  .template-btn.active {
+    border-color: #6c63ff;
+    background: #ede9ff;
+  }
+  .template-btn .t-label {
+    font-size: 11px;
+    color: #a78bfa;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .template-btn .t-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2d2d6b;
+  }
+  .template-btn .t-desc {
+    font-size: 12px;
+    color: #888;
+    margin-top: 3px;
+  }
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .form-panel { }
+  .form-body { padding: 20px; }
+  .form-body label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #444;
+    margin-bottom: 5px;
+    margin-top: 14px;
+  }
+  .form-body label:first-child { margin-top: 0; }
+  .form-body input, .form-body select, .form-body textarea {
+    width: 100%;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    resize: vertical;
+  }
+  .form-body input:focus, .form-body select:focus, .form-body textarea:focus {
+    outline: none;
+    border-color: #6c63ff;
+  }
+  .generate-btn {
+    width: 100%;
+    margin-top: 18px;
+    background: linear-gradient(90deg, #6c63ff, #a78bfa);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.5px;
+  }
+  .generate-btn:hover { opacity: 0.90; transform: translateY(-1px); }
+  .generate-btn:active { transform: translateY(0); }
+
+  .output-section { }
+  .output-body { padding: 20px; }
+  .output-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .tab-btn {
+    background: #f0f0f0;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    background: #6c63ff;
+    color: white;
+  }
+  .output-box {
+    background: #f8f7ff;
+    border: 1.5px solid #e0dbff;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: #333;
+    min-height: 160px;
+    white-space: pre-wrap;
+    position: relative;
+  }
+  .output-box.prompt-box {
+    background: #1e1e3f;
+    color: #c8c8ff;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 13px;
+    border-color: #3a3a7a;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(108,99,255,0.15);
+    border: 1.5px solid rgba(108,99,255,0.4);
+    color: #6c63ff;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { background: #6c63ff; color: white; }
+  .copy-btn.prompt-copy {
+    background: rgba(200,200,255,0.15);
+    border-color: rgba(200,200,255,0.4);
+    color: #c8c8ff;
+  }
+  .copy-btn.prompt-copy:hover { background: #6c63ff; color: white; }
+
+  .tips-box {
+    background: #fff9e6;
+    border: 1.5px solid #ffd96a;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #7a5800;
+    margin-top: 12px;
+  }
+  .tips-box strong { color: #b8860b; }
+
+  .placeholder-msg {
+    text-align: center;
+    color: #bbb;
+    font-size: 14px;
+    padding: 30px 0;
+  }
+  .hidden { display: none; }
+
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="badge">初級編デモ</div>
+    <h1>🤖 Claudeメールテンプレート生成デモ</h1>
+    <p>シーンを選んで空欄を埋めるだけ — プロンプトとメール例が自動生成されます</p>
+  </header>
+
+  <div class="layout">
+    <!-- 左: テンプレート一覧 -->
+    <div class="panel">
+      <div class="panel-header">📋 シーンを選ぶ</div>
+      <div class="template-list" id="templateList"></div>
+    </div>
+
+    <!-- 右: フォーム + 出力 -->
+    <div class="right-panel">
+      <div class="panel form-panel" id="formPanel">
+        <div class="panel-header">✏️ 情報を入力する</div>
+        <div class="form-body" id="formBody">
+          <div class="placeholder-msg">← 左からシーンを選んでください</div>
+        </div>
+      </div>
+
+      <div class="panel output-section" id="outputSection">
+        <div class="panel-header">💬 生成結果</div>
+        <div class="output-body">
+          <div class="output-tabs">
+            <button class="tab-btn active" onclick="switchTab('prompt')">Claudeへのプロンプト</button>
+            <button class="tab-btn" onclick="switchTab('email')">メール例</button>
+          </div>
+          <div id="outputArea">
+            <div class="placeholder-msg">左でシーンを選んで「生成する」を押してください</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const templates = [
+  {
+    id: 'first-request',
+    category: '依頼・お願い',
+    title: '初めての依頼メール',
+    desc: '面識のない相手に協力をお願いする',
+    fields: [
+      { id: 'to_role', label: '相手の役職・属性', placeholder: '例：A社の営業部長' },
+      { id: 'my_role', label: '自分の役職・会社', placeholder: '例：株式会社B 企画部の田中' },
+      { id: 'request', label: 'お願いしたい内容', placeholder: '例：来月のセミナーへの登壇' },
+      { id: 'benefit', label: '相手のメリット（あれば）', placeholder: '例：弊社100名の顧客にPRできる' },
+    ],
+    prompt: (v) =>
+`以下の条件でビジネスメールを書いてください。
+
+【送り先】${v.to_role}
+【送り主】${v.my_role}
+【依頼内容】${v.request}
+【相手のメリット】${v.benefit || 'なし'}
+
+条件：
+- 件名も含めて作成する
+- 敬語は丁寧だが堅すぎない
+- 300字以内でスッキリまとめる
+- 初対面なので最初に簡単な自己紹介を入れる`,
+    email: (v) =>
+`件名：【ご依頼】${v.request}についてのお願い
+
+${v.to_role} 様
+
+突然のご連絡をお許しください。
+${v.my_role}と申します。
+
+このたびは、${v.request}をお願いできないかと思いご連絡いたしました。${v.benefit ? `\n\n${v.benefit}と考えており、ぜひお力をお借りできれば幸いです。` : ''}
+
+もしご検討いただけるようでしたら、詳細についてお話しさせていただく機会を頂戴できますと大変ありがたく存じます。
+
+お忙しいところ恐縮ですが、どうぞよろしくお願いいたします。
+
+${v.my_role}`
+  },
+  {
+    id: 'deadline-extension',
+    category: '依頼・お願い',
+    title: '期限延長のお願い',
+    desc: '納期・締め切りを伸ばしてほしい',
+    fields: [
+      { id: 'to_name', label: '相手の名前', placeholder: '例：鈴木様' },
+      { id: 'task', label: '対象の業務・成果物', placeholder: '例：提案書の提出' },
+      { id: 'current_deadline', label: '現在の締め切り', placeholder: '例：6月10日' },
+      { id: 'new_deadline', label: '希望する新しい期限', placeholder: '例：6月15日' },
+      { id: 'reason', label: '遅延の理由', placeholder: '例：追加調査が必要になったため' },
+    ],
+    prompt: (v) =>
+`以下の状況で、期限延長をお願いするビジネスメールを作成してください。
+
+【宛先】${v.to_name}
+【対象業務】${v.task}
+【現在の締め切り】${v.current_deadline}
+【希望する新期限】${v.new_deadline}
+【理由】${v.reason}
+
+条件：
+- 件名も含めて作成する
+- 誠実に謝罪しつつ、理由をきちんと説明する
+- 相手への配慮を示す一文を入れる
+- 250字以内`,
+    email: (v) =>
+`件名：【ご相談】${v.task}の期限延長のお願い
+
+${v.to_name}
+
+いつもお世話になっております。
+
+${v.task}につきまして、誠に恐れ入りますが、期限の延長をご相談させていただきたく存じます。
+
+現在${v.current_deadline}を期限としていただいておりますが、${v.reason}、${v.new_deadline}まで延長いただけますでしょうか。
+
+ご迷惑をおかけして大変申し訳ございません。引き続き全力で取り組みますので、何卒ご理解のほどよろしくお願いいたします。`
+  },
+  {
+    id: 'after-meeting',
+    category: 'お礼・フォロー',
+    title: '商談後のお礼メール',
+    desc: '打ち合わせ・商談の翌日に送る',
+    fields: [
+      { id: 'to_name', label: '相手の名前', placeholder: '例：山田様' },
+      { id: 'meeting_content', label: '打ち合わせの内容', placeholder: '例：新サービスの導入提案' },
+      { id: 'key_point', label: '印象に残った点・合意事項', placeholder: '例：コスト削減効果に関心を持っていただけた' },
+      { id: 'next_action', label: '次のアクション', placeholder: '例：来週中に見積もりをお送りする' },
+    ],
+    prompt: (v) =>
+`商談後のお礼メールを作成してください。
+
+【宛先】${v.to_name}
+【打ち合わせ内容】${v.meeting_content}
+【印象に残った点・合意事項】${v.key_point}
+【次のアクション】${v.next_action}
+
+条件：
+- 件名も含めて作成する
+- 感謝の気持ちを自然に表現する
+- 次のアクションを明記して前向きな印象で締める
+- 200〜250字程度`,
+    email: (v) =>
+`件名：本日はありがとうございました（${v.meeting_content}）
+
+${v.to_name}
+
+本日はお時間をいただきありがとうございました。
+
+${v.meeting_content}についてお話しいただき、特に${v.key_point}、大変参考になりました。
+
+引き続き${v.next_action}、どうぞよろしくお願いいたします。
+
+またご不明な点などございましたら、いつでもお気軽にご連絡ください。
+今後ともよろしくお願いいたします。`
+  },
+  {
+    id: 'gentle-decline',
+    category: '断り・謝罪',
+    title: '丁寧なお断りメール',
+    desc: '依頼・招待を角が立たずに断る',
+    fields: [
+      { id: 'to_name', label: '相手の名前', placeholder: '例：佐藤様' },
+      { id: 'request_content', label: '断る依頼の内容', placeholder: '例：来月の講演登壇' },
+      { id: 'reason', label: '断る理由', placeholder: '例：先約が入っているため' },
+    ],
+    prompt: (v) =>
+`丁寧にお断りするビジネスメールを作成してください。
+
+【宛先】${v.to_name}
+【断る依頼】${v.request_content}
+【理由】${v.reason}
+
+条件：
+- 件名も含めて作成する
+- 感謝を先に述べてから断る
+- 理由を簡潔に伝え、今後の関係維持を大切にした締め
+- 200字以内でスマートにまとめる`,
+    email: (v) =>
+`件名：Re: ${v.request_content}のご依頼について
+
+${v.to_name}
+
+このたびは${v.request_content}のご依頼をいただき、誠にありがとうございます。
+
+大変光栄なお話ではございますが、${v.reason}、今回は誠に残念ながらお受けすることが難しい状況です。
+
+せっかくのお申し出にお応えできず申し訳ございません。またの機会にぜひよろしくお願いいたします。`
+  },
+  {
+    id: 'apology-delay',
+    category: '断り・謝罪',
+    title: '遅延・ミスの謝罪メール',
+    desc: '迷惑をかけた相手へ誠実に謝罪する',
+    fields: [
+      { id: 'to_name', label: '相手の名前', placeholder: '例：高橋様' },
+      { id: 'incident', label: '何が遅れた・何のミスか', placeholder: '例：請求書の送付が2日遅れた' },
+      { id: 'cause', label: '原因', placeholder: '例：担当者の確認ミスにより' },
+      { id: 'measures', label: '再発防止策', placeholder: '例：チェックリストを整備しダブルチェック体制を導入' },
+    ],
+    prompt: (v) =>
+`謝罪メールを作成してください。
+
+【宛先】${v.to_name}
+【問題の内容】${v.incident}
+【原因】${v.cause}
+【再発防止策】${v.measures}
+
+条件：
+- 件名も含めて作成する
+- まず謝罪、次に原因、最後に再発防止策の順で構成
+- 言い訳がましくならないよう注意
+- 300字以内`,
+    email: (v) =>
+`件名：【お詫び】${v.incident}について
+
+${v.to_name}
+
+このたびは${v.incident}、大変ご迷惑をおかけしてしまい、誠に申し訳ございませんでした。
+
+${v.cause}、このような事態を招いてしまいました。
+
+再発防止策として${v.measures}ことを決定いたしました。今後はこのようなご不便をおかけしないよう、万全を期してまいります。
+
+改めて深くお詫び申し上げます。`
+  },
+  {
+    id: 'progress-report',
+    category: '報告・連絡',
+    title: '進捗報告メール',
+    desc: 'プロジェクトの現状を上司・顧客に伝える',
+    fields: [
+      { id: 'to_name', label: '宛先', placeholder: '例：部長' },
+      { id: 'project', label: 'プロジェクト名・業務名', placeholder: '例：新CRM導入プロジェクト' },
+      { id: 'progress', label: '現在の進捗状況', placeholder: '例：要件定義が完了し、設計フェーズに入った（全体の40%）' },
+      { id: 'issues', label: '課題・懸念点（なければ「なし」）', placeholder: '例：外部ベンダーの回答が遅れている' },
+      { id: 'next', label: '次のマイルストーン', placeholder: '例：6月15日までに設計書の初版を提出' },
+    ],
+    prompt: (v) =>
+`以下の情報をもとに、進捗報告メールを作成してください。
+
+【宛先】${v.to_name}
+【プロジェクト名】${v.project}
+【現在の進捗】${v.progress}
+【課題・懸念点】${v.issues}
+【次のマイルストーン】${v.next}
+
+条件：
+- 件名も含めて作成する
+- 箇条書きを活用して読みやすくする
+- ポジティブな締め言葉で終わる
+- 300字以内`,
+    email: (v) =>
+`件名：【進捗報告】${v.project}（${new Date().toLocaleDateString('ja-JP')}時点）
+
+${v.to_name}
+
+${v.project}の進捗をご報告いたします。
+
+■ 現状
+${v.progress}
+
+■ 課題・懸念点
+${v.issues}
+
+■ 次のマイルストーン
+${v.next}
+
+引き続き計画達成に向けて取り組んでまいります。ご確認のほど、よろしくお願いいたします。`
+  },
+  {
+    id: 'completion-report',
+    category: '報告・連絡',
+    title: '業務完了の連絡メール',
+    desc: '依頼された業務が完了したことを伝える',
+    fields: [
+      { id: 'to_name', label: '宛先', placeholder: '例：田中さん' },
+      { id: 'task', label: '完了した業務', placeholder: '例：見積もり資料の作成' },
+      { id: 'deliverable', label: '成果物・添付物', placeholder: '例：見積書（PDF）を添付' },
+      { id: 'note', label: '補足・注意事項（なければ空欄）', placeholder: '例：金額は概算です。詳細は打ち合わせ時に調整可能' },
+    ],
+    prompt: (v) =>
+`業務完了の報告メールを作成してください。
+
+【宛先】${v.to_name}
+【完了した業務】${v.task}
+【成果物・添付物】${v.deliverable}
+【補足・注意事項】${v.note || 'なし'}
+
+条件：
+- 件名も含めて作成する
+- 簡潔でわかりやすく
+- 追加対応が必要な場合はいつでも連絡してほしい旨を入れる
+- 200字以内`,
+    email: (v) =>
+`件名：【完了】${v.task}のご報告
+
+${v.to_name}
+
+ご依頼いただいておりました${v.task}が完了いたしました。
+
+${v.deliverable}、ご確認いただけますと幸いです。${v.note ? `\n\n※ ${v.note}` : ''}
+
+ご不明な点やご修正のご要望がございましたら、お気軽にお申し付けください。
+よろしくお願いいたします。`
+  },
+  {
+    id: 'introduction-thanks',
+    category: 'お礼・フォロー',
+    title: '紹介・つないでもらったお礼',
+    desc: '知人に誰かを紹介してもらった後のお礼',
+    fields: [
+      { id: 'to_name', label: '紹介してくれた人の名前', placeholder: '例：中村様' },
+      { id: 'introduced', label: '紹介してもらった相手', placeholder: '例：株式会社Xの伊藤様' },
+      { id: 'result', label: '紹介後の状況・成果', placeholder: '例：早速打ち合わせの日程が決まった' },
+    ],
+    prompt: (v) =>
+`紹介していただいたことへのお礼メールを作成してください。
+
+【宛先】${v.to_name}
+【紹介された相手】${v.introduced}
+【その後の状況】${v.result}
+
+条件：
+- 件名も含めて作成する
+- 感謝の気持ちを具体的に表現する
+- 紹介のおかげで良いことが起きていることを伝える
+- 180字以内`,
+    email: (v) =>
+`件名：${v.introduced}様をご紹介いただきありがとうございました
+
+${v.to_name}
+
+先日は${v.introduced}様をご紹介いただき、誠にありがとうございました。
+
+おかげさまで${v.result}、大変喜んでおります。
+
+${v.to_name}のおかげです。今後ともどうぞよろしくお願いいたします。`
+  },
+];
+
+let activeTemplate = null;
+let activeTab = 'prompt';
+let lastOutput = { prompt: '', email: '' };
+
+function renderTemplateList() {
+  const list = document.getElementById('templateList');
+  const categories = [...new Set(templates.map(t => t.category))];
+  list.innerHTML = '';
+  categories.forEach(cat => {
+    const catDiv = document.createElement('div');
+    catDiv.style.cssText = 'font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;padding:4px 4px 4px 8px;letter-spacing:1px;';
+    catDiv.textContent = cat;
+    list.appendChild(catDiv);
+    templates.filter(t => t.category === cat).forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'template-btn' + (activeTemplate?.id === t.id ? ' active' : '');
+      btn.innerHTML = `<div class="t-label">${t.category}</div><div class="t-title">${t.title}</div><div class="t-desc">${t.desc}</div>`;
+      btn.onclick = () => selectTemplate(t);
+      list.appendChild(btn);
+    });
+  });
+}
+
+function selectTemplate(t) {
+  activeTemplate = t;
+  renderTemplateList();
+  renderForm(t);
+  clearOutput();
+}
+
+function renderForm(t) {
+  const body = document.getElementById('formBody');
+  body.innerHTML = '';
+  t.fields.forEach(f => {
+    const label = document.createElement('label');
+    label.textContent = f.label;
+    const input = f.rows
+      ? Object.assign(document.createElement('textarea'), { rows: f.rows || 2, placeholder: f.placeholder, id: f.id })
+      : Object.assign(document.createElement('input'), { type: 'text', placeholder: f.placeholder, id: f.id });
+    body.appendChild(label);
+    body.appendChild(input);
+  });
+  const btn = document.createElement('button');
+  btn.className = 'generate-btn';
+  btn.textContent = '✨ プロンプトとメール例を生成する';
+  btn.onclick = generate;
+  body.appendChild(btn);
+}
+
+function getValues() {
+  const v = {};
+  activeTemplate.fields.forEach(f => {
+    v[f.id] = document.getElementById(f.id)?.value.trim() || '';
+  });
+  return v;
+}
+
+function generate() {
+  if (!activeTemplate) return;
+  const v = getValues();
+  lastOutput.prompt = activeTemplate.prompt(v);
+  lastOutput.email = activeTemplate.email(v);
+  renderOutput();
+}
+
+function renderOutput() {
+  const area = document.getElementById('outputArea');
+  if (activeTab === 'prompt') {
+    area.innerHTML = `
+      <div class="output-box prompt-box" id="outputText">${escHtml(lastOutput.prompt)}<button class="copy-btn prompt-copy" onclick="copyOutput('prompt')">コピー</button></div>
+      <div class="tips-box" style="margin-top:12px">
+        <strong>💡 使い方：</strong>このプロンプトをそのままClaudeにコピペしてください。より精度を上げたい場合は、「もっと丁寧に」「もっと短く」などと追加指示できます。
+      </div>`;
+  } else {
+    area.innerHTML = `
+      <div class="output-box" id="outputText">${escHtml(lastOutput.email)}<button class="copy-btn" onclick="copyOutput('email')">コピー</button></div>
+      <div class="tips-box" style="margin-top:12px">
+        <strong>💡 注意：</strong>これはAIが生成したサンプルです。実際に送信する前に内容・宛先・敬称などを必ずご確認ください。
+      </div>`;
+  }
+}
+
+function clearOutput() {
+  const area = document.getElementById('outputArea');
+  area.innerHTML = '<div class="placeholder-msg">情報を入力して「生成する」を押してください</div>';
+  lastOutput = { prompt: '', email: '' };
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'prompt') || (i === 1 && tab === 'email'));
+  });
+  if (lastOutput.prompt) renderOutput();
+}
+
+function copyOutput(type) {
+  const text = type === 'prompt' ? lastOutput.prompt : lastOutput.email;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    if (btn) { btn.textContent = '✓ コピー済み'; setTimeout(() => btn.textContent = 'コピー', 1500); }
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+renderTemplateList();
+// Default select first template for nice initial state
+selectTemplate(templates[0]);
+</script>
+</body>
+</html>
