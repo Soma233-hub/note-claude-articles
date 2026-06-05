@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCQA構造ビルダー × Claude</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #7c3aed, #2563eb, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+    .header p {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .panel {
+      background: #1e2130;
+      border: 1px solid #2d3a4a;
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-title .badge {
+      background: #7c3aed22;
+      color: #a78bfa;
+      border: 1px solid #7c3aed44;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .scqa-block {
+      margin-bottom: 16px;
+    }
+    .scqa-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .scqa-letter {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .s-letter { background: #1d4ed833; color: #60a5fa; border: 1px solid #1d4ed855; }
+    .c-letter { background: #92400e33; color: #fbbf24; border: 1px solid #92400e55; }
+    .q-letter { background: #1a3a1a; color: #4ade80; border: 1px solid #166534; }
+    .a-letter { background: #4c0519; color: #fb7185; border: 1px solid #881337; }
+    .scqa-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    .scqa-desc {
+      font-size: 11px;
+      color: #64748b;
+    }
+    textarea {
+      width: 100%;
+      background: #131620;
+      border: 1px solid #2d3a4a;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+      padding: 10px 12px;
+      resize: none;
+      line-height: 1.6;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #7c3aed66;
+    }
+    textarea::placeholder { color: #475569; }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.03em;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: scale(0.99); }
+    .output-area {
+      min-height: 360px;
+    }
+    .output-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 320px;
+      color: #475569;
+      gap: 12px;
+    }
+    .output-placeholder svg {
+      opacity: 0.3;
+    }
+    .output-placeholder p {
+      font-size: 13px;
+    }
+    .result-section {
+      display: none;
+    }
+    .result-section.active {
+      display: block;
+    }
+    .prompt-box {
+      background: #131620;
+      border: 1px solid #2d3a4a;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .prompt-box-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prompt-box-title::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #7c3aed;
+    }
+    .prompt-text {
+      font-size: 13px;
+      line-height: 1.8;
+      color: #94a3b8;
+      white-space: pre-wrap;
+    }
+    .output-text {
+      font-size: 14px;
+      line-height: 1.9;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+    }
+    .score-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .score-card {
+      flex: 1;
+      background: #131620;
+      border: 1px solid #2d3a4a;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .score-num {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #7c3aed, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .score-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .tag {
+      display: inline-block;
+      background: #1e2a3a;
+      border: 1px solid #2d4a6a;
+      color: #60a5fa;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin: 2px;
+    }
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .before-box, .after-box {
+      background: #131620;
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .before-box { border: 1px solid #44403c; }
+    .after-box { border: 1px solid #166534; }
+    .box-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .before-label { color: #78716c; }
+    .after-label { color: #4ade80; }
+    .box-content { font-size: 12px; line-height: 1.7; color: #94a3b8; }
+    .examples {
+      margin-top: 20px;
+    }
+    .example-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .example-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid #2d3a4a;
+      background: #131620;
+      color: #64748b;
+      transition: all 0.2s;
+    }
+    .example-tab:hover, .example-tab.active {
+      background: #7c3aed22;
+      border-color: #7c3aed66;
+      color: #a78bfa;
+    }
+    .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 14px;
+      background: #7c3aed;
+      margin-left: 2px;
+      animation: blink 0.8s infinite;
+      vertical-align: middle;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .progress-bar {
+      width: 100%;
+      height: 3px;
+      background: #1e2130;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+      display: none;
+    }
+    .progress-bar.active { display: block; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #2563eb, #06b6d4);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .full-width {
+      grid-column: 1 / -1;
+    }
+    .tips-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .tip-card {
+      background: #131620;
+      border-radius: 10px;
+      padding: 14px;
+      border-top: 3px solid;
+    }
+    .tip-card:nth-child(1) { border-color: #60a5fa; }
+    .tip-card:nth-child(2) { border-color: #fbbf24; }
+    .tip-card:nth-child(3) { border-color: #4ade80; }
+    .tip-card:nth-child(4) { border-color: #fb7185; }
+    .tip-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .tip-body { font-size: 11px; color: #64748b; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>SCQA構造ビルダー × Claude</h1>
+    <p>4つの要素を入力するだけで、説得力のある文章をClaude向けプロンプトに変換します</p>
+  </div>
+
+  <div class="container">
+    <!-- 入力パネル -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>入力フォーム</span>
+        <span class="badge">SCQA Structure</span>
+      </div>
+
+      <div class="examples">
+        <div style="font-size:12px; color:#64748b; margin-bottom:8px;">サンプルを選択:</div>
+        <div class="example-tabs">
+          <button class="example-tab active" onclick="loadExample(0)">営業提案</button>
+          <button class="example-tab" onclick="loadExample(1)">社内改善</button>
+          <button class="example-tab" onclick="loadExample(2)">ブログ記事</button>
+        </div>
+      </div>
+
+      <div class="scqa-block">
+        <div class="scqa-label">
+          <div class="scqa-letter s-letter">S</div>
+          <div>
+            <div class="scqa-name">Situation（状況）</div>
+            <div class="scqa-desc">読者が既に知っている背景・前提条件</div>
+          </div>
+        </div>
+        <textarea id="s-input" rows="3" placeholder="例：我が社は3年前からSFAツールを導入しています"></textarea>
+      </div>
+
+      <div class="scqa-block">
+        <div class="scqa-label">
+          <div class="scqa-letter c-letter">C</div>
+          <div>
+            <div class="scqa-name">Complication（複雑化）</div>
+            <div class="scqa-desc">状況を変えた問題・障害・変化</div>
+          </div>
+        </div>
+        <textarea id="c-input" rows="3" placeholder="例：しかし入力率が40%に留まり、データ精度が低い状態が続いています"></textarea>
+      </div>
+
+      <div class="scqa-block">
+        <div class="scqa-label">
+          <div class="scqa-letter q-letter">Q</div>
+          <div>
+            <div class="scqa-name">Question（疑問）</div>
+            <div class="scqa-desc">読者が自然に感じる「では、どうすれば？」</div>
+          </div>
+        </div>
+        <textarea id="q-input" rows="2" placeholder="例：どうすれば入力率を改善し、売上予測の精度を高められるか？"></textarea>
+      </div>
+
+      <div class="scqa-block">
+        <div class="scqa-label">
+          <div class="scqa-letter a-letter">A</div>
+          <div>
+            <div class="scqa-name">Answer（答え）</div>
+            <div class="scqa-desc">あなたが提案・主張したい解決策・結論</div>
+          </div>
+        </div>
+        <textarea id="a-input" rows="3" placeholder="例：音声入力機能の導入とゲーミフィケーションにより、入力率を80%以上に改善できます"></textarea>
+      </div>
+
+      <div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:8px;">文章の用途</div>
+        <select id="purpose" style="width:100%; background:#131620; border:1px solid #2d3a4a; border-radius:8px; color:#e2e8f0; padding:8px 12px; font-size:13px; font-family:inherit;">
+          <option value="proposal">営業提案書・企画書</option>
+          <option value="blog">ブログ・note記事</option>
+          <option value="email">ビジネスメール</option>
+          <option value="report">レポート・報告書</option>
+          <option value="sns">SNS投稿（LinkedIn等）</option>
+        </select>
+      </div>
+
+      <button class="btn" onclick="generate()">
+        ⚡ Claudeプロンプトを生成する
+      </button>
+      <div class="progress-bar" id="progress">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- 出力パネル -->
+    <div class="panel output-area">
+      <div class="panel-title">
+        <span>生成結果</span>
+        <span class="badge">Output</span>
+      </div>
+
+      <div class="output-placeholder" id="placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <p>左のフォームを入力して</p>
+        <p>「生成する」ボタンを押してください</p>
+      </div>
+
+      <div class="result-section" id="result">
+        <div class="prompt-box">
+          <div class="prompt-box-title">Claudeへのプロンプト（コピペ用）</div>
+          <div class="prompt-text" id="generated-prompt"></div>
+        </div>
+
+        <div class="prompt-box" style="border-color: #166534;">
+          <div class="prompt-box-title" style="color:#4ade80;">✦ Claude出力サンプル（プレビュー）</div>
+          <div class="output-text" id="generated-output"></div>
+        </div>
+
+        <div class="score-row">
+          <div class="score-card">
+            <div class="score-num" id="score-readability">—</div>
+            <div class="score-label">可読性スコア</div>
+          </div>
+          <div class="score-card">
+            <div class="score-num" id="score-persuasion">—</div>
+            <div class="score-label">説得力スコア</div>
+          </div>
+          <div class="score-card">
+            <div class="score-num" id="score-structure">—</div>
+            <div class="score-label">構造スコア</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ビフォー/アフター -->
+    <div class="panel full-width" id="before-after-panel" style="display:none;">
+      <div class="panel-title">
+        <span>Before / After 比較</span>
+        <span class="badge">改善効果の可視化</span>
+      </div>
+      <div class="before-after">
+        <div class="before-box">
+          <div class="box-label before-label">✗ SCQA未使用（従来の書き方）</div>
+          <div class="box-content" id="before-text"></div>
+        </div>
+        <div class="after-box">
+          <div class="box-label after-label">✓ SCQA構造適用後</div>
+          <div class="box-content" id="after-text"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ヒント -->
+    <div class="panel full-width">
+      <div class="panel-title">
+        <span>SCQA活用のコツ</span>
+        <span class="badge">Tips</span>
+      </div>
+      <div class="tips-grid">
+        <div class="tip-card">
+          <div class="tip-title" style="color:#60a5fa;">📍 S: 短く切る</div>
+          <div class="tip-body">状況は読者が知っていることだけ書く。「共通認識の確認」に留める。長すぎると読者は飛ばす。</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-title" style="color:#fbbf24;">⚡ C: 感情を動かす</div>
+          <div class="tip-body">複雑化は数字・損失・リスクで具体化する。「読者が不安や危機感を感じる」のが理想。</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-title" style="color:#4ade80;">❓ Q: 読者の声で書く</div>
+          <div class="tip-body">疑問は「読者が心の中で呟く言葉」そのまま。回りくどい表現は逆効果。シンプルに。</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-title" style="color:#fb7185;">🎯 A: 結論を先に</div>
+          <div class="tip-body">答えは冒頭で断言する。「理由は3つあります」など数字で予告すると最後まで読まれやすい。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const examples = [
+      {
+        s: "我が社は3年前からSFAツール（営業支援システム）を導入しています。当初は営業効率化を目的とし、全社員に展開しました。",
+        c: "しかし実際の入力率は40%に留まり、「入力が面倒」「外出先で使いにくい」という声が絶えません。結果としてデータ精度が低く、経営会議での売上予測が毎回外れる状態が続いています。",
+        q: "どうすれば営業担当者の入力負荷を下げ、入力率80%以上を実現できるか？",
+        a: "スマートフォン対応の音声入力機能を追加し、ゲーミフィケーション（入力ランキング表示）で行動変容を促すことで、3ヶ月以内に入力率80%超を達成できます。"
+      },
+      {
+        s: "弊社では毎週月曜朝に全体朝礼（1時間）を実施しており、これは創業以来の慣習です。",
+        c: "リモートワーク移行後、参加率が60%台に落ち込み、「情報が非同期で見られれば不要」という声が増えています。残業時間も月平均4時間増加しました。",
+        q: "朝礼の意義を保ちながら、全員が参加しやすく生産性も高める方法はあるか？",
+        a: "週次朝礼を30分の動画収録＋Slackスレッド質疑に切り替えることで、全員非同期参加・情報密度向上・月4時間の残業削減を同時に達成できます。"
+      },
+      {
+        s: "ChatGPTが登場して以来、多くのビジネスパーソンがAIライティングを試みています。",
+        c: "しかし「なんとなく書いてもらったが、薄い文章になる」「自分の意図が伝わらない」という悩みが絶えません。AIに任せるほど、文章がのっぺりして個性が消えるという逆説が生まれています。",
+        q: "AIを使って、むしろ自分の文章を強化するにはどうすればよいか？",
+        a: "SCQA構造で「何を書くか」を先に設計し、Claudeに「文章化だけ」依頼することで、論理的かつ個性のある文章が3分で完成します。"
+      }
+    ];
+
+    const purposeLabels = {
+      proposal: '営業提案書・企画書',
+      blog: 'ブログ・note記事',
+      email: 'ビジネスメール',
+      report: 'レポート・報告書',
+      sns: 'SNS投稿（LinkedIn等）'
+    };
+
+    function loadExample(idx) {
+      document.querySelectorAll('.example-tab').forEach((t, i) => {
+        t.classList.toggle('active', i === idx);
+      });
+      const ex = examples[idx];
+      document.getElementById('s-input').value = ex.s;
+      document.getElementById('c-input').value = ex.c;
+      document.getElementById('q-input').value = ex.q;
+      document.getElementById('a-input').value = ex.a;
+    }
+
+    function generate() {
+      const s = document.getElementById('s-input').value.trim();
+      const c = document.getElementById('c-input').value.trim();
+      const q = document.getElementById('q-input').value.trim();
+      const a = document.getElementById('a-input').value.trim();
+      const purpose = document.getElementById('purpose').value;
+
+      if (!s || !c || !q || !a) {
+        alert('4つの項目をすべて入力してください');
+        return;
+      }
+
+      const progress = document.getElementById('progress');
+      const fill = document.getElementById('progress-fill');
+      progress.classList.add('active');
+
+      let width = 0;
+      const interval = setInterval(() => {
+        width += Math.random() * 15;
+        if (width > 90) width = 90;
+        fill.style.width = width + '%';
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(interval);
+        fill.style.width = '100%';
+        setTimeout(() => {
+          progress.classList.remove('active');
+          fill.style.width = '0%';
+          showResult(s, c, q, a, purpose);
+        }, 300);
+      }, 1200);
+    }
+
+    function showResult(s, c, q, a, purpose) {
+      const purposeLabel = purposeLabels[purpose];
+
+      const prompt = `以下のSCQA構造をもとに、${purposeLabel}として説得力のある文章を作成してください。
+
+【Situation（状況）】
+${s}
+
+【Complication（複雑化）】
+${c}
+
+【Question（読者が感じる疑問）】
+${q}
+
+【Answer（提案・結論）】
+${a}
+
+【要件】
+- 読者が「なるほど、そうすべきだ」と納得できる論理構成にする
+- 冒頭は課題感（Complication）から入り、答え（Answer）を先に提示する
+- 具体的な数字や事実を活かしてください
+- 文体は${purpose === 'blog' || purpose === 'sns' ? '親しみやすい口語調' : 'ビジネス文書として簡潔・明快な文体'}で`;
+
+      const outputs = {
+        proposal: `【ご提案の核心】
+SFAの入力率を現在の40%から80%以上へ改善し、売上予測精度を大幅に向上させます。
+
+■ 現状の課題
+3年前に導入したSFAツールですが、入力率は40%に低迷しています。「入力が面倒」「外出先で使いにくい」という声が根本原因であり、データ精度の低さから経営判断の精度にも影響が出ています。
+
+■ 提案する解決策
+① スマートフォン対応の音声入力機能の追加
+　→ 商談直後、移動中でも30秒で入力完了
+② ゲーミフィケーション（入力ランキング）の導入
+　→ 行動変容を自然に促し、継続率を高める
+
+■ 期待される成果
+・入力率：40% → 80%以上（3ヶ月以内）
+・売上予測精度：±30% → ±10%以内
+・経営会議の資料作成時間：50%削減
+
+以上により、SFAへの投資対効果を最大化することが可能です。`,
+        blog: `「AIに書かせているのに、なぜか薄い文章になる」
+
+そんな悩みを抱えるビジネスパーソンが急増しています。実は問題はAIではなく、書く前の「設計不足」にあります。
+
+解決策はシンプルです。**SCQA構造**で骨格を作り、Claudeに「肉付け」だけを任せる。これだけで、論理的かつ個性のある文章が3分で完成します。
+
+## SCQA構造とは
+
+- **S**ituation（状況）：読者が知っている前提
+- **C**omplication（複雑化）：それを変えた問題
+- **Q**uestion（疑問）：読者が感じる「では？」
+- **A**nswer（答え）：あなたの提案・結論
+
+この4つを埋めてからClaudeに渡すと、AIは「何を書くか迷う時間」をゼロにして、質の高い文章を出力してくれます。`,
+        email: `件名：SFA入力率改善に向けた新機能導入のご提案
+
+お世話になっております。
+
+現在、SFAの入力率が40%に低迷し、売上予測精度に課題が生じていることはご認識の通りです。
+
+この状況を解消するため、音声入力機能とゲーミフィケーション機能の導入をご提案させてください。実証データによると、同様の施策で他社では3ヶ月以内に入力率80%超を達成しています。
+
+詳細は添付の提案資料をご参照いただき、来週中にお時間をいただけますと幸いです。
+
+何卒よろしくお願いいたします。`,
+        report: `## 要旨
+
+SFA入力率の低迷（現状40%）を起因とする売上予測精度の低下について、音声入力機能とゲーミフィケーション導入による改善策を報告する。3ヶ月以内に入力率80%以上達成が見込まれる。
+
+## 背景と問題の所在
+
+3年前より運用しているSFAツールへの入力率が目標値（80%）を大きく下回り40%で推移している。ヒアリング調査（n=45）の結果、主要因は「入力工数の大きさ」（68%）および「モバイル対応の不備」（54%）であった。
+
+## 改善提案
+
+改善策として以下の2施策を推奨する。（後略）`,
+        sns: `「SFAを入れたのに、使われない」
+
+これ、多くの企業が直面している現実です。入力率40%という数字は、データドリブン経営の夢が絵に描いた餅になっている証拠。
+
+解決策は意外とシンプル。「使うのが面倒」という摩擦を取り除くこと。音声入力で30秒、ゲーミフィケーションで続けたくなる仕組み。
+
+ツール導入より、行動設計の方が重要です。
+
+#営業DX #SFA活用 #業務改善`
+      };
+
+      document.getElementById('generated-prompt').textContent = prompt;
+      document.getElementById('generated-output').textContent = outputs[purpose] || outputs.proposal;
+
+      const scores = {
+        readability: Math.floor(Math.random() * 10) + 88,
+        persuasion: Math.floor(Math.random() * 10) + 85,
+        structure: 98
+      };
+
+      document.getElementById('score-readability').textContent = scores.readability;
+      document.getElementById('score-persuasion').textContent = scores.persuasion;
+      document.getElementById('score-structure').textContent = scores.structure;
+
+      const beforeTexts = {
+        proposal: "SFAを3年前に導入しました。入力率が低いです。音声入力機能を追加することを提案します。ゲーミフィケーションも効果的だと思います。ぜひご検討ください。",
+        blog: "AIで文章を書く方法を紹介します。Claudeを使うといいです。SCQA構造というものがあります。これを使うと文章がよくなります。",
+        email: "SFAの入力率改善についてご提案があります。音声入力機能とゲーミフィケーションを導入してはどうでしょうか。詳細はお話できればと思います。",
+        report: "SFAの入力率が低いです。原因を調査しました。改善策を検討しています。（詳細略）",
+        sns: "SFAの使用率が低いです。音声入力を導入すると改善できます。#SFA"
+      };
+
+      document.getElementById('before-text').textContent = beforeTexts[purpose] || beforeTexts.proposal;
+      document.getElementById('after-text').textContent = (outputs[purpose] || outputs.proposal).substring(0, 280) + '...';
+
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('result').classList.add('active');
+      document.getElementById('before-after-panel').style.display = 'block';
+    }
+
+    loadExample(0);
+  </script>
+</body>
+</html>
