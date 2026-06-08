@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>Claudeプロンプト比較デモ：NG例 vs OK例</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+    background: #f0f4ff;
+    min-height: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px;
+  }
+  h1 {
+    font-size: 22px;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 28px;
+    text-align: center;
+  }
+  .steps-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .step-btn {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 2px solid #d1d5db;
+    background: white;
+    cursor: pointer;
+    font-size: 13px;
+    color: #6b7280;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .step-btn.active {
+    background: #5b4fcf;
+    border-color: #5b4fcf;
+    color: white;
+    font-weight: 600;
+  }
+  .step-btn:hover:not(.active) {
+    border-color: #5b4fcf;
+    color: #5b4fcf;
+  }
+  .compare-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 1100px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    position: relative;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .badge.ng { background: #fee2e2; color: #dc2626; }
+  .badge.ok { background: #d1fae5; color: #059669; }
+  .card-title { font-size: 15px; font-weight: 600; color: #374151; }
+  .prompt-box {
+    background: #f9fafb;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: #374151;
+    min-height: 70px;
+  }
+  .prompt-box.ng-box { border-color: #fca5a5; background: #fff5f5; }
+  .prompt-box.ok-box { border-color: #6ee7b7; background: #f0fdf4; }
+  .label { font-size: 11px; font-weight: 600; color: #9ca3af; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .response-box {
+    background: #f8f9ff;
+    border-left: 4px solid #5b4fcf;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.75;
+    color: #374151;
+  }
+  .response-box.ng-res { border-left-color: #f87171; background: #fff8f8; }
+  .response-box.ok-res { border-left-color: #34d399; background: #f0fff8; }
+  .diff-tag {
+    display: inline-block;
+    background: #ede9fe;
+    color: #7c3aed;
+    border-radius: 6px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 2px 2px;
+  }
+  .insight-bar {
+    width: 100%;
+    max-width: 1100px;
+    background: linear-gradient(135deg, #5b4fcf 0%, #7c6cf0 100%);
+    border-radius: 14px;
+    padding: 18px 28px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .insight-icon { font-size: 28px; }
+  .insight-text { font-size: 14px; line-height: 1.6; }
+  .insight-text strong { font-size: 15px; display: block; margin-bottom: 3px; }
+  .progress-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .prog-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #d1d5db;
+    transition: background 0.3s;
+  }
+  .prog-dot.done { background: #5b4fcf; }
+</style>
+</head>
+<body>
+
+<h1>🚀 Claudeプロンプト比較デモ</h1>
+<p class="subtitle">同じお願いでも「書き方」で返答の質がここまで変わります</p>
+
+<div class="steps-nav" id="stepsNav"></div>
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="compare-container" id="compareContainer"></div>
+
+<div class="insight-bar" id="insightBar">
+  <div class="insight-icon">💡</div>
+  <div class="insight-text" id="insightText"></div>
+</div>
+
+<script>
+const scenarios = [
+  {
+    label: "① 依頼の具体度",
+    ng: {
+      title: "曖昧な依頼",
+      prompt: "メール書いて",
+      response: "件名：お世話になっております\n\nお世話になっております。\n[件名をここに記入]\n[本文をここに記入]\n\nよろしくお願いいたします。"
+    },
+    ok: {
+      title: "具体的な依頼",
+      prompt: "取引先（田中部長）へ、来週月曜14時の打ち合わせ確認メールを書いてください。丁寧なビジネス文体で、3〜4文程度にまとめてください。",
+      response: "件名：打ち合わせのご確認（来週月曜日14時）\n\n田中部長\n\nお世話になっております。来週月曜日（6月15日）14時からの打ち合わせについてご確認させてください。\n引き続きよろしくお願いいたします。"
+    },
+    insight: "「誰に・何を・どんな形式で」の3要素を加えるだけで、そのまま使えるメールが出力されます。"
+  },
+  {
+    label: "② 背景情報の有無",
+    ng: {
+      title: "背景なし",
+      prompt: "この企画、改善してください",
+      response: "企画内容が不明のため、改善できません。企画書をご共有ください。"
+    },
+    ok: {
+      title: "背景あり",
+      prompt: "【企画】30代向けオンライン料理教室。月額2,980円、週1回60分のライブ授業。【課題】申込率が低い。【ターゲット】共働き夫婦。この企画の弱点と改善案を3つ挙げてください。",
+      response: "【弱点①】価格訴求が弱い → 「初月無料」や「1回あたり745円」と換算して伝えると申込率UP\n【弱点②】時間の固定感 → 見逃し配信を追加し「忙しくても安心」を強調\n【弱点③】成果が見えない → 「1か月で3品マスター」など具体的な成果を前面に"
+    },
+    insight: "背景・課題・ターゲットを「コンテキスト」として先に渡すと、Claudeが本当に使える提案を返してくれます。"
+  },
+  {
+    label: "③ 出力形式の指定",
+    ng: {
+      title: "形式を指定しない",
+      prompt: "AIを使うメリットを教えて",
+      response: "AIを使うメリットは様々あります。まず、作業の効率化が挙げられます。次に、情報の整理も得意です。また、アイデア出しにも活用できます。さらに、文章作成も…（以下省略）"
+    },
+    ok: {
+      title: "表形式で指定",
+      prompt: "仕事でAIを使う主なメリットを「用途 / 具体例 / 時間短縮効果」の3列の表で5行まとめてください。",
+      response: "| 用途 | 具体例 | 時間短縮効果 |\n|------|--------|------------|\n| 文章作成 | メール・報告書 | 70%削減 |\n| 情報要約 | 議事録・会議資料 | 80%削減 |\n| アイデア出し | 企画・ブレスト | 60%削減 |\n| コード生成 | 関数・スクリプト | 75%削減 |\n| 翻訳・校正 | 英日翻訳・誤字修正 | 90%削減 |"
+    },
+    insight: "「表で」「箇条書きで」「〇行で」と出力形式を指定すると、コピペしてそのまま使える形で返ってきます。"
+  },
+  {
+    label: "④ 役割の設定",
+    ng: {
+      title: "役割なし",
+      prompt: "プレゼンの練習をしたい",
+      response: "プレゼンの練習方法をいくつか提案します。鏡の前で話す、録画して見返す、人に聞いてもらう…など様々な方法があります。"
+    },
+    ok: {
+      title: "役割を設定",
+      prompt: "あなたはベテランのプレゼンコーチです。私が発表原稿を送るので、「①話の構成」「②言葉の選び方」「③聴衆への訴求力」の3点から厳しくフィードバックしてください。",
+      response: "プレゼンコーチとして厳しく評価します。原稿を送っていただければ、①構成の論理性・流れ、②専門用語の多用や曖昧表現、③冒頭フックと感情訴求の3軸で具体的な改善点をお伝えします。準備はいいですか？"
+    },
+    insight: "「あなたは〇〇です」と役割を設定すると、その専門家視点で回答してくれます。コーチ・編集者・批評家など何でも設定可能です。"
+  },
+  {
+    label: "⑤ 制約の追加",
+    ng: {
+      title: "制約なし",
+      prompt: "Claudeの使い方を説明して",
+      response: "Claudeは様々な用途に活用できます。文章作成、コード生成、質問応答、翻訳、要約、アイデア出し…（長文続く）"
+    },
+    ok: {
+      title: "制約あり",
+      prompt: "Claude初心者向けに、使い方のポイントを「1点につき20字以内」で5つ、箇条書きで説明してください。難しい言葉は使わないでください。",
+      response: "• 具体的に何をしてほしいか伝える\n• 背景情報を一緒に共有する\n• 出力の形式を指定する\n• 役割（コーチ・編集者など）を与える\n• 納得いかなければ「もっと〇〇に」と伝える"
+    },
+    insight: "「〇字以内」「〇個」「難しい言葉は使わないで」など制約を加えると、目的に合った回答になります。"
+  }
+];
+
+let current = 0;
+
+function renderNav() {
+  const nav = document.getElementById('stepsNav');
+  const bar = document.getElementById('progressBar');
+  nav.innerHTML = scenarios.map((s, i) =>
+    `<button class="step-btn${i===current?' active':''}" onclick="setStep(${i})">${s.label}</button>`
+  ).join('');
+  bar.innerHTML = scenarios.map((_, i) =>
+    `<div class="prog-dot${i<=current?' done':''}"></div>`
+  ).join('');
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function renderCompare() {
+  const s = scenarios[current];
+  document.getElementById('compareContainer').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="badge ng">NG</span>
+        <span class="card-title">${s.ng.title}</span>
+      </div>
+      <div class="label">プロンプト</div>
+      <div class="prompt-box ng-box">${escapeHtml(s.ng.prompt)}</div>
+      <div class="label">Claudeの返答</div>
+      <div class="response-box ng-res">${escapeHtml(s.ng.response)}</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="badge ok">OK</span>
+        <span class="card-title">${s.ok.title}</span>
+      </div>
+      <div class="label">プロンプト</div>
+      <div class="prompt-box ok-box">${escapeHtml(s.ok.prompt)}</div>
+      <div class="label">Claudeの返答</div>
+      <div class="response-box ok-res">${escapeHtml(s.ok.response)}</div>
+    </div>
+  `;
+  document.getElementById('insightText').innerHTML = `<strong>💡 ポイント ${current+1}/5</strong>${s.insight}`;
+}
+
+function setStep(i) {
+  current = i;
+  renderNav();
+  renderCompare();
+}
+
+setStep(0);
+</script>
+</body>
+</html>
