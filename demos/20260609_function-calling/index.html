@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Function Calling インタラクティブデモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #a78bfa;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 28px;
+  }
+  .container {
+    width: 100%;
+    max-width: 1100px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 720px) {
+    .container { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: #1e2130;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel-header {
+    background: #252840;
+    padding: 12px 18px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #94a3b8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-purple { background: #a78bfa; }
+  .dot-green { background: #34d399; }
+  .dot-yellow { background: #fbbf24; }
+  .dot-blue { background: #60a5fa; }
+  .panel-body { padding: 18px; }
+
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .scenario-btn {
+    background: #252840;
+    border: 1px solid #3d4165;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .scenario-btn:hover, .scenario-btn.active {
+    border-color: #a78bfa;
+    background: #2d2f5a;
+  }
+  .scenario-btn .icon { font-size: 1.4rem; margin-bottom: 4px; display: block; }
+  .scenario-btn .label { font-size: 0.75rem; font-weight: 600; color: #c4b5fd; }
+  .scenario-btn .desc { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
+
+  .user-query {
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.88rem;
+    color: #e2e8f0;
+    line-height: 1.5;
+    min-height: 60px;
+    margin-bottom: 14px;
+  }
+
+  .run-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #7c3aed, #a78bfa);
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .run-btn:hover { opacity: 0.88; }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .step-list { list-style: none; }
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #1e2130;
+    opacity: 0.3;
+    transition: opacity 0.4s;
+  }
+  .step-item.active { opacity: 1; }
+  .step-item:last-child { border-bottom: none; }
+  .step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #252840;
+    border: 1px solid #3d4165;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700; color: #64748b;
+    flex-shrink: 0;
+  }
+  .step-item.active .step-num {
+    background: #7c3aed; border-color: #a78bfa; color: white;
+  }
+  .step-label { font-size: 0.78rem; font-weight: 600; color: #94a3b8; }
+  .step-desc { font-size: 0.72rem; color: #64748b; margin-top: 2px; }
+
+  .code-block {
+    background: #0a0c14;
+    border: 1px solid #1e2130;
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    min-height: 80px;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .code-block .kw { color: #f472b6; }
+  .code-block .str { color: #34d399; }
+  .code-block .key { color: #60a5fa; }
+  .code-block .num { color: #fbbf24; }
+  .code-block .cmt { color: #4a5568; font-style: italic; }
+  .code-block .punc { color: #94a3b8; }
+
+  .response-box {
+    background: #0f1117;
+    border-left: 3px solid #a78bfa;
+    border-radius: 0 8px 8px 0;
+    padding: 14px;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #cbd5e1;
+    min-height: 80px;
+    transition: all 0.3s;
+  }
+
+  .tool-def-panel {
+    grid-column: 1 / -1;
+  }
+  .tool-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  @media (max-width: 720px) {
+    .tool-grid { grid-template-columns: 1fr 1fr; }
+    .tool-def-panel { grid-column: 1; }
+  }
+  .tool-card {
+    background: #0a0c14;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    padding: 14px;
+    transition: all 0.3s;
+  }
+  .tool-card.selected {
+    border-color: #a78bfa;
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
+  }
+  .tool-card .t-icon { font-size: 1.5rem; margin-bottom: 6px; }
+  .tool-card .t-name { font-size: 0.78rem; font-weight: 700; color: #c4b5fd; font-family: monospace; }
+  .tool-card .t-desc { font-size: 0.68rem; color: #64748b; margin-top: 4px; line-height: 1.4; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .badge-purple { background: #3730a3; color: #c4b5fd; }
+  .badge-green { background: #065f46; color: #34d399; }
+  .badge-yellow { background: #78350f; color: #fbbf24; }
+
+  .thinking-indicator {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    font-size: 0.78rem;
+    color: #a78bfa;
+  }
+  .thinking-indicator.show { display: flex; }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #3730a3;
+    border-top-color: #a78bfa;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-bar {
+    height: 2px;
+    background: #1e2130;
+    border-radius: 1px;
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    width: 0;
+    transition: width 0.5s ease;
+    border-radius: 1px;
+  }
+</style>
+</head>
+<body>
+
+<h1>⚡ Claude Function Calling デモ</h1>
+<p class="subtitle">Claudeがどのようにツールを選択し、JSON形式で呼び出すかを体験できます</p>
+
+<div class="container">
+
+  <!-- 利用可能なツール一覧 -->
+  <div class="panel tool-def-panel">
+    <div class="panel-header">
+      <span class="dot dot-blue"></span>
+      定義済みツール（4種類）
+    </div>
+    <div class="panel-body">
+      <div class="tool-grid" id="toolGrid">
+        <div class="tool-card" id="tool-get_weather">
+          <div class="t-icon">🌤️</div>
+          <div class="t-name">get_weather</div>
+          <div class="t-desc">都市名と日時から天気・気温・降水確率を返す</div>
+        </div>
+        <div class="tool-card" id="tool-search_products">
+          <div class="t-icon">🔍</div>
+          <div class="t-name">search_products</div>
+          <div class="t-desc">商品名・カテゴリ・価格帯で商品を検索する</div>
+        </div>
+        <div class="tool-card" id="tool-send_email">
+          <div class="t-icon">📧</div>
+          <div class="t-name">send_email</div>
+          <div class="t-desc">宛先・件名・本文を指定してメールを送信する</div>
+        </div>
+        <div class="tool-card" id="tool-calc_mortgage">
+          <div class="t-icon">🏠</div>
+          <div class="t-name">calc_mortgage</div>
+          <div class="t-desc">借入額・金利・返済期間から月額返済額を計算する</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- シナリオ選択 -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot dot-purple"></span>
+      シナリオ選択 &amp; ユーザー入力
+    </div>
+    <div class="panel-body">
+      <div class="scenario-grid">
+        <button class="scenario-btn active" onclick="selectScenario(0)">
+          <span class="icon">🌤️</span>
+          <div class="label">天気照会</div>
+          <div class="desc">単一ツール呼び出し</div>
+        </button>
+        <button class="scenario-btn" onclick="selectScenario(1)">
+          <span class="icon">🛒</span>
+          <div class="label">商品検索</div>
+          <div class="desc">パラメータ変換</div>
+        </button>
+        <button class="scenario-btn" onclick="selectScenario(2)">
+          <span class="icon">📧</span>
+          <div class="label">メール送信</div>
+          <div class="desc">複雑なパラメータ</div>
+        </button>
+        <button class="scenario-btn" onclick="selectScenario(3)">
+          <span class="icon">🏠</span>
+          <div class="label">住宅ローン計算</div>
+          <div class="desc">数値変換・計算</div>
+        </button>
+      </div>
+      <div class="user-query" id="userQuery"></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <button class="run-btn" id="runBtn" onclick="runDemo()">▶ Function Calling を実行</button>
+    </div>
+  </div>
+
+  <!-- 処理ステップ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot dot-yellow"></span>
+      Claudeの処理ステップ
+    </div>
+    <div class="panel-body">
+      <div class="thinking-indicator" id="thinkingIndicator">
+        <div class="spinner"></div>
+        <span>Claude が思考中...</span>
+      </div>
+      <ul class="step-list" id="stepList">
+        <li class="step-item" id="step-1">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-label">入力解析</div>
+            <div class="step-desc">ユーザーの意図を識別</div>
+          </div>
+        </li>
+        <li class="step-item" id="step-2">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-label">ツール選択</div>
+            <div class="step-desc">最適なツールを選定</div>
+          </div>
+        </li>
+        <li class="step-item" id="step-3">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-label">パラメータ生成</div>
+            <div class="step-desc">JSONパラメータを構築</div>
+          </div>
+        </li>
+        <li class="step-item" id="step-4">
+          <div class="step-num">4</div>
+          <div>
+            <div class="step-label">ツール実行</div>
+            <div class="step-desc">外部APIを呼び出し</div>
+          </div>
+        </li>
+        <li class="step-item" id="step-5">
+          <div class="step-num">5</div>
+          <div>
+            <div class="step-label">最終応答生成</div>
+            <div class="step-desc">結果を自然言語に変換</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ツール呼び出しJSON -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot dot-green"></span>
+      生成されたツール呼び出し（JSON）
+    </div>
+    <div class="panel-body">
+      <div style="margin-bottom: 6px; font-size: 0.72rem; color: #64748b;">
+        <span class="badge badge-purple" id="badgeType">tool_use</span>
+        <span class="badge badge-green" id="badgeTool">—</span>
+      </div>
+      <div class="code-block" id="toolCallJson">
+        <span class="cmt">// ▶ 実行ボタンを押すとJSON が生成されます</span>
+      </div>
+      <div style="margin-top: 12px; margin-bottom: 6px; font-size: 0.72rem; color: #64748b;">
+        <span class="badge badge-yellow">tool_result</span> モックレスポンス
+      </div>
+      <div class="code-block" id="toolResultJson">
+        <span class="cmt">// ツール実行後のレスポンス</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Claudeの最終応答 -->
+  <div class="panel tool-def-panel">
+    <div class="panel-header">
+      <span class="dot dot-purple"></span>
+      Claudeの最終応答
+    </div>
+    <div class="panel-body">
+      <div class="response-box" id="finalResponse">
+        実行後にClaudeの回答がここに表示されます。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const scenarios = [
+  {
+    label: '天気照会',
+    tool: 'get_weather',
+    query: '東京の明日の天気を教えてください。傘が必要かどうかも知りたいです。',
+    toolCall: {
+      type: 'tool_use',
+      id: 'toolu_01AbCd',
+      name: 'get_weather',
+      input: {
+        location: '東京',
+        date: '2026-06-10',
+        unit: 'celsius'
+      }
+    },
+    toolResult: {
+      content: [{
+        type: 'tool_result',
+        tool_use_id: 'toolu_01AbCd',
+        content: '{"location":"東京","date":"2026-06-10","weather":"曇り時々雨","temperature":{"max":22,"min":18},"precipitation_probability":65,"wind_speed":"12km/h"}'
+      }]
+    },
+    response: '明日（6月10日）の東京の天気は**曇り時々雨**です。\n\n🌡️ 気温：最高22℃ / 最低18℃\n☔ 降水確率：65%\n💨 風速：12km/h\n\n降水確率が65%と高めですので、**傘を持っていくことをおすすめします**。折り畳み傘があると安心です。'
+  },
+  {
+    label: '商品検索',
+    tool: 'search_products',
+    query: '1万円以下のワイヤレスイヤホンでおすすめを探してください。',
+    toolCall: {
+      type: 'tool_use',
+      id: 'toolu_02EfGh',
+      name: 'search_products',
+      input: {
+        query: 'ワイヤレスイヤホン',
+        category: 'audio',
+        max_price: 10000,
+        sort: 'rating_desc'
+      }
+    },
+    toolResult: {
+      content: [{
+        type: 'tool_result',
+        tool_use_id: 'toolu_02EfGh',
+        content: '{"results":[{"name":"SoundBuds Pro X","price":8980,"rating":4.6,"battery":"8h"},{"name":"QuietWave 300","price":9480,"rating":4.4,"battery":"6h"},{"name":"AirFlow Lite","price":6980,"rating":4.3,"battery":"10h"}],"total":47}'
+      }]
+    },
+    response: '1万円以下のワイヤレスイヤホンのおすすめを3点ご紹介します：\n\n1. **SoundBuds Pro X** — ¥8,980（評価：4.6★）\n   バッテリー8時間。総合評価トップクラス\n\n2. **QuietWave 300** — ¥9,480（評価：4.4★）\n   音質重視の方向け。ノイズキャンセル対応\n\n3. **AirFlow Lite** — ¥6,980（評価：4.3★）\n   最長10時間駆動でコスパ最優秀\n\n毎日の通勤用なら**AirFlow Lite**、音楽を重視するなら**SoundBuds Pro X**がおすすめです。'
+  },
+  {
+    label: 'メール送信',
+    tool: 'send_email',
+    query: '田中部長（tanaka@example.com）に「明日の会議は14時からに変更になりました」という内容でメールを送ってください。',
+    toolCall: {
+      type: 'tool_use',
+      id: 'toolu_03IjKl',
+      name: 'send_email',
+      input: {
+        to: 'tanaka@example.com',
+        subject: '【変更】明日の会議時間について',
+        body: '田中部長\n\nお疲れ様です。\n\n明日予定しておりました会議ですが、\n14時からに変更となりました。\n\nご確認のほど、よろしくお願いいたします。',
+        priority: 'normal'
+      }
+    },
+    toolResult: {
+      content: [{
+        type: 'tool_result',
+        tool_use_id: 'toolu_03IjKl',
+        content: '{"status":"sent","message_id":"msg_20260609_1234","delivered_at":"2026-06-09T14:35:22Z"}'
+      }]
+    },
+    response: '田中部長へのメールを送信しました。✅\n\n📧 **送信内容**\n- 宛先：tanaka@example.com\n- 件名：【変更】明日の会議時間について\n- 本文：会議時間が14時からに変更になった旨を丁寧に記載\n\n件名に【変更】を付け、フォーマルなビジネス文体に整えて送信しました。'
+  },
+  {
+    label: '住宅ローン計算',
+    tool: 'calc_mortgage',
+    query: '3000万円の住宅ローンを金利1.5%で35年払いにした場合の月々の返済額を教えてください。',
+    toolCall: {
+      type: 'tool_use',
+      id: 'toolu_04MnOp',
+      name: 'calc_mortgage',
+      input: {
+        loan_amount: 30000000,
+        annual_rate: 0.015,
+        term_years: 35,
+        payment_type: 'equal_payment'
+      }
+    },
+    toolResult: {
+      content: [{
+        type: 'tool_result',
+        tool_use_id: 'toolu_04MnOp',
+        content: '{"monthly_payment":76880,"total_payment":32289600,"total_interest":2289600,"loan_amount":30000000}'
+      }]
+    },
+    response: '3,000万円・金利1.5%・35年ローンの試算結果です：\n\n💰 **月々の返済額：76,880円**\n\n| 項目 | 金額 |\n|------|------|\n| 借入額 | 30,000,000円 |\n| 総返済額 | 32,289,600円 |\n| 総利息 | 2,289,600円 |\n\n月々約7.7万円と比較的負担が少なく、総利息も約229万円（借入額の約7.6%）に抑えられます。なお、これは元利均等返済の概算です。実際の申し込みでは金融機関にご確認ください。'
+  }
+];
+
+let currentScenario = 0;
+let isRunning = false;
+
+function selectScenario(idx) {
+  currentScenario = idx;
+  document.querySelectorAll('.scenario-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  document.getElementById('userQuery').textContent = scenarios[idx].query;
+  resetUI();
+}
+
+function resetUI() {
+  document.querySelectorAll('.step-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tool-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('toolCallJson').innerHTML = '<span class="cmt">// ▶ 実行ボタンを押すとJSON が生成されます</span>';
+  document.getElementById('toolResultJson').innerHTML = '<span class="cmt">// ツール実行後のレスポンス</span>';
+  document.getElementById('finalResponse').textContent = '実行後にClaudeの回答がここに表示されます。';
+  document.getElementById('badgeTool').textContent = '—';
+  document.getElementById('progressFill').style.width = '0';
+  document.getElementById('thinkingIndicator').classList.remove('show');
+}
+
+function syntaxHighlight(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  return json
+    .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g, '<span class="key">$1</span>$2')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>')
+    .replace(/:\s*(\d+\.?\d*)/g, ': <span class="num">$1</span>')
+    .replace(/:\s*(true|false|null)/g, ': <span class="kw">$1</span>')
+    .replace(/([{}[\],])/g, '<span class="punc">$1</span>');
+}
+
+async function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runDemo() {
+  if (isRunning) return;
+  isRunning = true;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  resetUI();
+
+  const s = scenarios[currentScenario];
+
+  document.getElementById('thinkingIndicator').classList.add('show');
+
+  // Step 1
+  await delay(400);
+  document.getElementById('step-1').classList.add('active');
+  document.getElementById('progressFill').style.width = '20%';
+  await delay(500);
+
+  // Step 2
+  document.getElementById('step-2').classList.add('active');
+  document.getElementById('progressFill').style.width = '40%';
+  document.getElementById('tool-' + s.tool).classList.add('selected');
+  document.getElementById('badgeTool').textContent = s.tool;
+  await delay(600);
+
+  // Step 3
+  document.getElementById('step-3').classList.add('active');
+  document.getElementById('progressFill').style.width = '60%';
+  document.getElementById('toolCallJson').innerHTML = syntaxHighlight(s.toolCall);
+  await delay(700);
+
+  // Step 4
+  document.getElementById('step-4').classList.add('active');
+  document.getElementById('progressFill').style.width = '80%';
+  document.getElementById('toolResultJson').innerHTML = syntaxHighlight(s.toolResult);
+  await delay(600);
+
+  // Step 5
+  document.getElementById('step-5').classList.add('active');
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('thinkingIndicator').classList.remove('show');
+
+  // Type out response
+  const responseEl = document.getElementById('finalResponse');
+  responseEl.textContent = '';
+  const text = s.response;
+  for (let i = 0; i < text.length; i++) {
+    responseEl.textContent += text[i];
+    if (i % 3 === 0) await delay(12);
+  }
+
+  btn.disabled = false;
+  isRunning = false;
+}
+
+// Init
+selectScenario(0);
+</script>
+</body>
+</html>
