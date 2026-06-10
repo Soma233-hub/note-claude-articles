@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Function Calling シミュレーター</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+    background: #0f1117;
+    color: #e1e4e8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f0f0f0;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    font-size: 0.85rem;
+    color: #8b949e;
+    margin-bottom: 24px;
+  }
+  .container {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 1160px;
+  }
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel h2 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8b949e;
+    margin-bottom: 14px;
+  }
+  .tools-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tool-card {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tool-card:hover { border-color: #58a6ff; background: #161b22; }
+  .tool-card.selected { border-color: #58a6ff; background: #1c2433; }
+  .tool-card .tool-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #58a6ff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .tool-card .tool-desc {
+    font-size: 0.75rem;
+    color: #8b949e;
+    line-height: 1.4;
+  }
+  .flow-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .query-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .query-label {
+    font-size: 0.75rem;
+    color: #8b949e;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .query-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border: 1px solid #30363d;
+    background: #0d1117;
+    color: #c9d1d9;
+    transition: all 0.2s;
+  }
+  .chip:hover { border-color: #58a6ff; color: #58a6ff; }
+  .chip.active { border-color: #58a6ff; background: #1c2433; color: #58a6ff; }
+  .run-btn {
+    padding: 10px 20px;
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    align-self: flex-start;
+  }
+  .run-btn:hover { background: #2ea043; }
+  .run-btn:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .step {
+    display: flex;
+    gap: 12px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.35s ease;
+  }
+  .step.visible { opacity: 1; transform: translateY(0); }
+  .step-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 28px;
+  }
+  .step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-connector {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    background: #30363d;
+    margin: 3px 0;
+  }
+  .step-content {
+    flex: 1;
+    padding-bottom: 16px;
+  }
+  .step-role {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .step-body {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    font-family: 'Fira Code', 'Consolas', monospace;
+  }
+  .step-body.user { border-color: #388bfd40; }
+  .step-body.claude { border-color: #3fb95040; }
+  .step-body.tool { border-color: #e3b34140; }
+  .step-body.result { border-color: #8957e540; }
+
+  .dot-user { background: #1f4f99; color: #58a6ff; }
+  .dot-claude { background: #1a3d26; color: #3fb950; }
+  .dot-tool { background: #3d2800; color: #e3b341; }
+  .dot-result { background: #2d1f4e; color: #a371f7; }
+  .role-user { color: #58a6ff; }
+  .role-claude { color: #3fb950; }
+  .role-tool { color: #e3b341; }
+  .role-result { color: #a371f7; }
+
+  .json-key { color: #79c0ff; }
+  .json-str { color: #a5d6ff; }
+  .json-num { color: #d2a8ff; }
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #484f58;
+    font-size: 0.85rem;
+  }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 8px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-get { background: #0d419d; color: #58a6ff; }
+  .badge-post { background: #1f3d1f; color: #3fb950; }
+  .badge-db { background: #3d2800; color: #e3b341; }
+</style>
+</head>
+<body>
+<h1>Claude Function Calling シミュレーター</h1>
+<p class="subtitle">Claudeが外部ツールを呼び出す仕組みをインタラクティブに体験</p>
+
+<div class="container">
+  <!-- Left: Tools -->
+  <div class="panel">
+    <h2>利用可能なツール</h2>
+    <div class="tools-list">
+      <div class="tool-card selected" data-tool="weather" onclick="selectTool(this, 'weather')">
+        <div class="tool-name">🌤️ get_weather <span class="badge badge-get">GET</span></div>
+        <div class="tool-desc">指定した都市の現在の天気・気温・湿度を返す</div>
+      </div>
+      <div class="tool-card" data-tool="search" onclick="selectTool(this, 'search')">
+        <div class="tool-name">🔍 search_database <span class="badge badge-db">DB</span></div>
+        <div class="tool-desc">製品データベースから条件に合う商品を検索</div>
+      </div>
+      <div class="tool-card" data-tool="calendar" onclick="selectTool(this, 'calendar')">
+        <div class="tool-name">📅 create_event <span class="badge badge-post">POST</span></div>
+        <div class="tool-desc">Googleカレンダーにイベントを作成・登録</div>
+      </div>
+      <div class="tool-card" data-tool="calc" onclick="selectTool(this, 'calc')">
+        <div class="tool-name">🧮 run_python <span class="badge badge-post">EXEC</span></div>
+        <div class="tool-desc">Pythonコードを安全なサンドボックスで実行</div>
+      </div>
+      <div class="tool-card" data-tool="email" onclick="selectTool(this, 'email')">
+        <div class="tool-name">📧 send_email <span class="badge badge-post">POST</span></div>
+        <div class="tool-desc">指定の宛先・件名・本文でメールを送信</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Flow -->
+  <div class="panel flow-panel">
+    <h2>実行フロー</h2>
+    <div class="query-section">
+      <div class="query-label">ユーザーの質問を選択</div>
+      <div class="query-chips" id="queryChips"></div>
+    </div>
+    <button class="run-btn" id="runBtn" onclick="runSimulation()">▶ シミュレーション実行</button>
+    <div class="flow-steps" id="flowSteps">
+      <div class="empty-state">
+        <div class="icon">⚡</div>
+        ツールを選択してシミュレーションを実行してください
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOOLS = {
+  weather: {
+    queries: [
+      '東京の今日の天気を教えて',
+      '大阪と名古屋、どちらが暑い？',
+      '明日の福岡の気温は？'
+    ],
+    flows: [
+      {
+        query: '東京の今日の天気を教えて',
+        steps: [
+          { role: 'user', label: 'ユーザー', text: '東京の今日の天気を教えて' },
+          { role: 'claude', label: 'Claude（思考中）', text: 'ユーザーは東京の天気を知りたい。\nget_weather ツールで取得できる。\n→ ツールを呼び出す' },
+          { role: 'tool', label: 'Tool Call', text: `{\n  "tool": "get_weather",\n  "parameters": {\n    "city": "Tokyo",\n    "unit": "celsius"\n  }\n}` },
+          { role: 'result', label: 'Tool Result', text: `{\n  "city": "Tokyo",\n  "temp": 28,\n  "humidity": 72,\n  "condition": "曇りのち晴れ",\n  "wind": "南南西 3m/s"\n}` },
+          { role: 'claude', label: 'Claude（最終回答）', text: '東京の今日の天気は **曇りのち晴れ** です。\n\n🌡️ 気温: 28°C\n💧 湿度: 72%\n💨 風: 南南西 3m/s\n\n午後から晴れてくる予報なので、お出かけには後半の時間帯が良さそうです！' }
+        ]
+      }
+    ]
+  },
+  search: {
+    queries: [
+      '3万円以下のノートPCを探して',
+      '在庫ありの4Kモニターは？',
+      'レビュー4.5以上のマウスを見せて'
+    ],
+    flows: [
+      {
+        query: '3万円以下のノートPCを探して',
+        steps: [
+          { role: 'user', label: 'ユーザー', text: '3万円以下のノートPCを探して' },
+          { role: 'claude', label: 'Claude（思考中）', text: '価格フィルター: max_price=30000\nカテゴリ: notebook\nsearch_database を呼び出す' },
+          { role: 'tool', label: 'Tool Call', text: `{\n  "tool": "search_database",\n  "parameters": {\n    "category": "notebook",\n    "max_price": 30000,\n    "in_stock": true\n  }\n}` },
+          { role: 'result', label: 'Tool Result', text: `{\n  "count": 3,\n  "items": [\n    {"name": "ThinkPad E14", "price": 28800, "stock": 5},\n    {"name": "HP 14s", "price": 24900, "stock": 12},\n    {"name": "ASUS Vivobook", "price": 29800, "stock": 3}\n  ]\n}` },
+          { role: 'claude', label: 'Claude（最終回答）', text: '3万円以下のノートPC、在庫ありで3件見つかりました！\n\n1. **HP 14s** ¥24,900（在庫12台）← コスパ最高\n2. **ThinkPad E14** ¥28,800（在庫5台）← ビジネス向け\n3. **ASUS Vivobook** ¥29,800（在庫3台）\n\nご用途を教えていただければ、より詳しくご提案できます。' }
+        ]
+      }
+    ]
+  },
+  calendar: {
+    queries: [
+      '明日14時に会議を設定して',
+      '来週月曜の朝にリマインダーを作って',
+      '金曜日の午後にランチ予定を追加'
+    ],
+    flows: [
+      {
+        query: '明日14時に会議を設定して',
+        steps: [
+          { role: 'user', label: 'ユーザー', text: '明日14時に会議を設定して' },
+          { role: 'claude', label: 'Claude（思考中）', text: '日時を解析: 2026-06-11 14:00\nタイトルが不明 → デフォルト「会議」で登録\ncreate_event を呼び出す' },
+          { role: 'tool', label: 'Tool Call', text: `{\n  "tool": "create_event",\n  "parameters": {\n    "title": "会議",\n    "date": "2026-06-11",\n    "time": "14:00",\n    "duration_min": 60\n  }\n}` },
+          { role: 'result', label: 'Tool Result', text: `{\n  "status": "created",\n  "event_id": "evt_8f2a9c",\n  "calendar": "primary",\n  "link": "https://calendar.google.com/...",\n  "reminder_set": true\n}` },
+          { role: 'claude', label: 'Claude（最終回答）', text: '✅ 明日（6/11）14:00〜15:00 に「会議」を登録しました！\n\n📅 カレンダーに追加済み\n🔔 30分前のリマインダーを自動設定\n\n会議のタイトルや参加者を追加しますか？' }
+        ]
+      }
+    ]
+  },
+  calc: {
+    queries: [
+      '1から100の合計を計算して',
+      '円周率を小数点100桁まで出して',
+      '100万の階乗の桁数は？'
+    ],
+    flows: [
+      {
+        query: '1から100の合計を計算して',
+        steps: [
+          { role: 'user', label: 'ユーザー', text: '1から100の合計を計算して' },
+          { role: 'claude', label: 'Claude（思考中）', text: 'sum(range(1,101)) で計算可能\nrun_python で正確に実行する' },
+          { role: 'tool', label: 'Tool Call', text: `{\n  "tool": "run_python",\n  "parameters": {\n    "code": "print(sum(range(1, 101)))",\n    "timeout": 5\n  }\n}` },
+          { role: 'result', label: 'Tool Result', text: `{\n  "stdout": "5050",\n  "stderr": "",\n  "exec_time_ms": 2,\n  "status": "success"\n}` },
+          { role: 'claude', label: 'Claude（最終回答）', text: '1から100の合計は **5050** です。\n\n💡 数式でも確認できます:\n  n(n+1)/2 = 100×101/2 = 5050\n\nガウスが少年時代に瞬時に解いた有名な問題ですね！' }
+        ]
+      }
+    ]
+  },
+  email: {
+    queries: [
+      '田中さんに会議変更の連絡をして',
+      'チーム全員に資料送付の案内を送って',
+      'お礼メールを山田部長に送って'
+    ],
+    flows: [
+      {
+        query: '田中さんに会議変更の連絡をして',
+        steps: [
+          { role: 'user', label: 'ユーザー', text: '田中さんに会議変更の連絡をして' },
+          { role: 'claude', label: 'Claude（思考中）', text: '変更後の日時が不明 → まず確認が必要\nただしデモのため仮の日時でメール草稿を作成' },
+          { role: 'tool', label: 'Tool Call', text: `{\n  "tool": "send_email",\n  "parameters": {\n    "to": "tanaka@example.com",\n    "subject": "【会議変更のご連絡】",\n    "body": "田中様\\n\\n先日の会議ですが、\\n都合により日程を変更させてください。\\n\\n新日程: 2026/06/15（月）14:00〜",\n    "dry_run": true\n  }\n}` },
+          { role: 'result', label: 'Tool Result', text: `{\n  "status": "draft_ready",\n  "preview": "送信前のプレビュー表示",\n  "to": "tanaka@example.com",\n  "estimated_delivery": "即時"\n}` },
+          { role: 'claude', label: 'Claude（最終回答）', text: 'メールの下書きを作成しました。送信前に確認してください👇\n\n**宛先**: 田中様\n**件名**: 【会議変更のご連絡】\n**内容**: 6/15（月）14:00〜 への変更案内\n\n変更後の日時や追記内容があればお知らせください。確認後に送信します。' }
+        ]
+      }
+    ]
+  }
+};
+
+let selectedTool = 'weather';
+let selectedQuery = TOOLS.weather.queries[0];
+
+function selectTool(el, tool) {
+  document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedTool = tool;
+  updateChips();
+  resetFlow();
+}
+
+function updateChips() {
+  const chips = document.getElementById('queryChips');
+  const queries = TOOLS[selectedTool].queries;
+  selectedQuery = queries[0];
+  chips.innerHTML = queries.map((q, i) =>
+    `<div class="chip ${i === 0 ? 'active' : ''}" onclick="selectQuery(this, '${q}')">${q}</div>`
+  ).join('');
+}
+
+function selectQuery(el, q) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selectedQuery = q;
+  resetFlow();
+}
+
+function resetFlow() {
+  document.getElementById('flowSteps').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">⚡</div>
+      ツールを選択してシミュレーションを実行してください
+    </div>`;
+  document.getElementById('runBtn').disabled = false;
+}
+
+async function runSimulation() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+
+  const flow = TOOLS[selectedTool].flows[0];
+  const steps = flow.steps;
+  const container = document.getElementById('flowSteps');
+  container.innerHTML = '';
+
+  const roleConfig = {
+    user: { dot: 'dot-user', role: 'role-user', body: 'user' },
+    claude: { dot: 'dot-claude', role: 'role-claude', body: 'claude' },
+    tool: { dot: 'dot-tool', role: 'role-tool', body: 'tool' },
+    result: { dot: 'dot-result', role: 'role-result', body: 'result' }
+  };
+
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const cfg = roleConfig[s.role];
+    const isLast = i === steps.length - 1;
+
+    const el = document.createElement('div');
+    el.className = 'step';
+    el.innerHTML = `
+      <div class="step-line">
+        <div class="step-dot ${cfg.dot}">${i + 1}</div>
+        ${!isLast ? '<div class="step-connector"></div>' : ''}
+      </div>
+      <div class="step-content">
+        <div class="step-role ${cfg.role}">${s.label}</div>
+        <div class="step-body ${cfg.body}">${s.text}</div>
+      </div>`;
+    container.appendChild(el);
+
+    await new Promise(r => setTimeout(r, 80));
+    el.classList.add('visible');
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  btn.disabled = false;
+}
+
+// Initialize
+updateChips();
+</script>
+</body>
+</html>
