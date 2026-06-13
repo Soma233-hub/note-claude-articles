@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Function Calling シミュレーター</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #252836;
+    --border: #2e3248;
+    --accent: #7c5cfc;
+    --accent2: #56cfb2;
+    --accent3: #f6a623;
+    --text: #e8eaf0;
+    --text-muted: #6b7280;
+    --claude: #7c5cfc;
+    --tool: #56cfb2;
+    --user: #f6a623;
+    --system: #e85454;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 600;
+  }
+
+  .badge.advanced { background: #e85454; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .left-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 14px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .scenarios {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .scenario-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    color: var(--text);
+  }
+
+  .scenario-btn:hover {
+    border-color: var(--accent);
+    background: #252836dd;
+  }
+
+  .scenario-btn.active {
+    border-color: var(--accent);
+    background: #7c5cfc18;
+  }
+
+  .scenario-btn .s-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .scenario-btn .s-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .scenario-btn .s-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .pat1 .s-label { color: var(--tool); }
+  .pat2 .s-label { color: var(--user); }
+  .pat3 .s-label { color: var(--accent); }
+  .pat4 .s-label { color: #e85454; }
+  .pat5 .s-label { color: #c084fc; }
+
+  .run-btn {
+    margin: 12px;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+
+  .run-btn:hover { opacity: 0.85; }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .flow-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .flow-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .step-count {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .flow-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .flow-step {
+    display: flex;
+    gap: 12px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.35s ease;
+  }
+
+  .flow-step.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .step-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-icon.user { background: #f6a62320; color: var(--user); }
+  .step-icon.claude { background: #7c5cfc20; color: var(--claude); }
+  .step-icon.tool { background: #56cfb220; color: var(--tool); }
+  .step-icon.result { background: #e8545420; color: var(--system); }
+  .step-icon.done { background: #56cfb220; color: var(--tool); }
+
+  .step-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .step-role {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .step-role.user { color: var(--user); }
+  .step-role.claude { color: var(--claude); }
+  .step-role.tool { color: var(--tool); }
+  .step-role.result { color: var(--system); }
+  .step-role.done { color: var(--tool); }
+
+  .step-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .step-card pre {
+    background: #0f1117;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    overflow-x: auto;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: #c9d1d9;
+  }
+
+  .step-card .key { color: #79b8ff; }
+  .step-card .str { color: #9ecbff; }
+  .step-card .num { color: #f8c555; }
+  .step-card .bool { color: #f97583; }
+
+  .tag {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .tag.parallel { background: #f6a62320; color: var(--user); }
+  .tag.loop { background: #c084fc20; color: #c084fc; }
+  .tag.branch { background: #e8545420; color: var(--system); }
+
+  .connector {
+    width: 2px;
+    background: var(--border);
+    height: 16px;
+    margin-left: 15px;
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    gap: 12px;
+  }
+
+  .empty-state .icon { font-size: 48px; opacity: 0.4; }
+  .empty-state p { font-size: 14px; }
+
+  .highlight { color: var(--accent2); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔧 Claude Function Calling シミュレーター</h1>
+  <span class="badge">Tool Use</span>
+  <span class="badge advanced">上級編</span>
+</header>
+
+<div class="main">
+  <div class="left-panel">
+    <div class="panel-header">
+      <div class="dot"></div>
+      実装パターンを選択
+    </div>
+
+    <div class="scenarios">
+      <div class="scenario-btn pat1 active" data-pat="1" onclick="selectPattern(1, this)">
+        <div class="s-label">パターン 1 — 単発呼び出し</div>
+        <div class="s-title">天気を調べて教えて</div>
+        <div class="s-desc">1つのツールを1回呼び出す最もシンプルな実装</div>
+      </div>
+
+      <div class="scenario-btn pat2" data-pat="2" onclick="selectPattern(2, this)">
+        <div class="s-label">パターン 2 — 並列呼び出し</div>
+        <div class="s-title">東京・大阪・福岡の天気比較</div>
+        <div class="s-desc">複数のツールを同時実行してレスポンスを高速化</div>
+      </div>
+
+      <div class="scenario-btn pat3" data-pat="3" onclick="selectPattern(3, this)">
+        <div class="s-label">パターン 3 — シーケンシャル</div>
+        <div class="s-title">GitHub issueを検索して要約</div>
+        <div class="s-desc">前の結果を次のツール呼び出しに活用する連鎖パターン</div>
+      </div>
+
+      <div class="scenario-btn pat4" data-pat="4" onclick="selectPattern(4, this)">
+        <div class="s-label">パターン 4 — 条件分岐</div>
+        <div class="s-title">社内データかWebを自律判断</div>
+        <div class="s-desc">Claudeが状況を判断してツールの使用有無を決定</div>
+      </div>
+
+      <div class="scenario-btn pat5" data-pat="5" onclick="selectPattern(5, this)">
+        <div class="s-label">パターン 5 — エージェントループ</div>
+        <div class="s-title">コードを修正・テスト・完成まで</div>
+        <div class="s-desc">タスク完了まで自律的にツールを呼び出し続けるループ</div>
+      </div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="runSimulation()">
+      ▶ シミュレーション実行
+    </button>
+  </div>
+
+  <div class="right-panel">
+    <div class="flow-header">
+      <div class="flow-title" id="flowTitle">パターン 1: 単発ツール呼び出し</div>
+      <div class="step-count" id="stepCount">シナリオを選択して実行してください</div>
+    </div>
+
+    <div class="flow-body" id="flowBody">
+      <div class="empty-state">
+        <div class="icon">⚡</div>
+        <p>左のパターンを選択して「実行」を押してください</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentPattern = 1;
+
+const PATTERNS = {
+  1: {
+    title: 'パターン 1: 単発ツール呼び出し',
+    steps: [
+      { role: 'user', icon: '👤', text: '東京の現在の天気を教えてください。', code: null },
+      { role: 'claude', icon: '🤖', text: 'ツール定義を確認し、<span class="highlight">get_weather</span> を呼び出すことを決定します。', code: `{
+  "type": "tool_use",
+  "id": "toolu_01abc",
+  "name": "get_weather",
+  "input": {
+    "city": "Tokyo",
+    "unit": "celsius"
+  }
+}` },
+      { role: 'tool', icon: '🔧', text: '<span class="highlight">get_weather("Tokyo")</span> を実行…', code: `// アプリがAPIを実行
+const result = await weatherAPI.get({ city: "Tokyo" });` },
+      { role: 'result', icon: '📦', text: 'ツール実行結果をClaudeへ返送:', code: `{
+  "type": "tool_result",
+  "tool_use_id": "toolu_01abc",
+  "content": {
+    "temperature": 28,
+    "condition": "晴れ",
+    "humidity": 65,
+    "wind": "南南西 4m/s"
+  }
+}` },
+      { role: 'done', icon: '✅', text: 'Claudeが最終回答を生成: 「東京の現在の天気は<span class="highlight">晴れ</span>で、気温は<span class="highlight">28°C</span>です。湿度65%、南南西の風4m/sです。」', code: null },
+    ]
+  },
+  2: {
+    title: 'パターン 2: 並列ツール呼び出し',
+    steps: [
+      { role: 'user', icon: '👤', text: '東京・大阪・福岡の天気を比較してください。', code: null },
+      { role: 'claude', icon: '🤖', text: '<span class="tag parallel">PARALLEL</span>3都市への <span class="highlight">get_weather</span> を同時呼び出し（レスポンスタイム1/3に短縮）:', code: `[
+  { "name": "get_weather", "input": { "city": "Tokyo" } },
+  { "name": "get_weather", "input": { "city": "Osaka" } },
+  { "name": "get_weather", "input": { "city": "Fukuoka" } }
+]` },
+      { role: 'tool', icon: '🔧', text: '<span class="tag parallel">PARALLEL</span>3つのAPIリクエストを並列実行:', code: `await Promise.all([
+  weatherAPI.get("Tokyo"),
+  weatherAPI.get("Osaka"),
+  weatherAPI.get("Fukuoka")
+]);` },
+      { role: 'result', icon: '📦', text: '3件の結果をまとめて返送:', code: `[
+  { "city": "Tokyo",   "temp": 28, "condition": "晴れ" },
+  { "city": "Osaka",   "temp": 31, "condition": "曇り" },
+  { "city": "Fukuoka", "temp": 26, "condition": "雨" }
+]` },
+      { role: 'done', icon: '✅', text: 'Claudeが3都市を比較: 「最も暑いのは<span class="highlight">大阪(31°C)</span>、最も涼しいのは<span class="highlight">福岡(26°C、雨)</span>です。」', code: null },
+    ]
+  },
+  3: {
+    title: 'パターン 3: シーケンシャル呼び出し',
+    steps: [
+      { role: 'user', icon: '👤', text: 'バグ報告のissueを検索して、対応状況を要約してください。', code: null },
+      { role: 'claude', icon: '🤖', text: 'まず <span class="highlight">search_issues</span> でissue一覧を取得:', code: `{
+  "name": "search_issues",
+  "input": {
+    "query": "bug",
+    "state": "open",
+    "limit": 10
+  }
+}` },
+      { role: 'result', icon: '📦', text: '10件のissueが返却 → 次のステップへ引き渡し:', code: `[
+  { "id": 142, "title": "ログインでクラッシュ", "comments": 5 },
+  { "id": 138, "title": "画像アップロード失敗", "comments": 2 },
+  ...
+]` },
+      { role: 'claude', icon: '🤖', text: '前の結果を受け取り、最重要issue #142の詳細を <span class="highlight">get_issue_detail</span> で追加取得:', code: `{
+  "name": "get_issue_detail",
+  "input": { "issue_id": 142 }
+}` },
+      { role: 'done', icon: '✅', text: '両ステップの情報を統合して要約: 「<span class="highlight">10件の未解決バグ</span>があり、最優先は #142（ログインクラッシュ）です。5件のコメントがあり、現在調査中です。」', code: null },
+    ]
+  },
+  4: {
+    title: 'パターン 4: 条件分岐（自律判断）',
+    steps: [
+      { role: 'user', icon: '👤', text: '第3四半期の売上データを教えてください。', code: null },
+      { role: 'claude', icon: '🤖', text: '<span class="tag branch">DECISION</span>利用可能なツールを確認: <span class="highlight">search_internal_db</span> vs <span class="highlight">web_search</span><br>→ 社内データベースを先に試みると判断:', code: `{
+  "name": "search_internal_db",
+  "input": {
+    "query": "Q3 sales",
+    "year": 2026
+  }
+}` },
+      { role: 'result', icon: '📦', text: '社内DBから結果を取得:', code: `{
+  "found": true,
+  "data": {
+    "Q3_2026_revenue": "¥842M",
+    "growth": "+18%",
+    "source": "internal_bi_system"
+  }
+}` },
+      { role: 'claude', icon: '🤖', text: '<span class="tag branch">SKIP</span><span class="highlight">web_search</span> の使用は不要と自律判断。社内データで十分と評価。', code: null },
+      { role: 'done', icon: '✅', text: '社内データのみで回答: 「2026年Q3の売上は<span class="highlight">¥842M（前年比+18%）</span>です。社内BIシステムより取得。」', code: null },
+    ]
+  },
+  5: {
+    title: 'パターン 5: エージェントループ',
+    steps: [
+      { role: 'user', icon: '👤', text: 'このPythonコードにユニットテストを追加して、すべてパスするまで修正してください。', code: null },
+      { role: 'claude', icon: '🤖', text: '<span class="tag loop">LOOP 1/3</span>まず <span class="highlight">read_file</span> でコードを確認:', code: `{ "name": "read_file", "input": { "path": "calc.py" } }` },
+      { role: 'claude', icon: '🤖', text: '<span class="tag loop">LOOP 2/3</span>テストを生成して <span class="highlight">write_file</span> で保存:', code: `{
+  "name": "write_file",
+  "input": {
+    "path": "test_calc.py",
+    "content": "import pytest\\n..."
+  }
+}` },
+      { role: 'claude', icon: '🤖', text: '<span class="tag loop">LOOP 3/3</span><span class="highlight">run_tests</span> を実行、失敗を検知して自動修正:', code: `// テスト実行
+{ "name": "run_tests", "input": { "file": "test_calc.py" } }
+// → FAILED: division by zero → バグ修正 → 再実行 → PASSED ✅` },
+      { role: 'done', icon: '✅', text: 'すべてのテストがパス。ループ終了: 「<span class="highlight">8個のテストケース</span>を追加し、1件のゼロ除算バグを修正しました。全テストPASSEDです。」', code: null },
+    ]
+  }
+};
+
+function selectPattern(num, el) {
+  currentPattern = num;
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const pat = PATTERNS[num];
+  document.getElementById('flowTitle').textContent = pat.title;
+  document.getElementById('stepCount').textContent = 'シナリオを選択して実行してください';
+  document.getElementById('flowBody').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">⚡</div>
+      <p>「実行」を押してシミュレーションを開始</p>
+    </div>`;
+}
+
+async function runSimulation() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = '▶ 実行中...';
+
+  const pat = PATTERNS[currentPattern];
+  const body = document.getElementById('flowBody');
+  body.innerHTML = '';
+
+  document.getElementById('stepCount').textContent = `${pat.steps.length} ステップ`;
+
+  for (let i = 0; i < pat.steps.length; i++) {
+    const s = pat.steps[i];
+
+    if (i > 0) {
+      const conn = document.createElement('div');
+      conn.className = 'connector';
+      body.appendChild(conn);
+    }
+
+    const el = document.createElement('div');
+    el.className = 'flow-step';
+
+    const codeBlock = s.code ? `<pre>${syntaxHL(s.code)}</pre>` : '';
+
+    el.innerHTML = `
+      <div class="step-icon ${s.role}">${s.icon}</div>
+      <div class="step-content">
+        <div class="step-role ${s.role}">${roleLabel(s.role)}</div>
+        <div class="step-card">${s.text}${codeBlock}</div>
+      </div>`;
+
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+
+    await delay(80);
+    el.classList.add('visible');
+    await delay(currentPattern === 5 ? 700 : 500);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '▶ もう一度実行';
+}
+
+function roleLabel(role) {
+  const labels = { user: 'USER', claude: 'CLAUDE → ツール呼び出し決定', tool: 'TOOL EXECUTION', result: 'TOOL RESULT → Claudeへ返送', done: 'CLAUDE → 最終応答' };
+  return labels[role] || role;
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function syntaxHL(code) {
+  return code
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="str">"$1"</span>')
+    .replace(/: (\d+)/g, ': <span class="num">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="bool">$1</span>')
+    .replace(/(\/\/[^\n]*)/g, '<span style="color:#6b7280">$1</span>');
+}
+</script>
+</body>
+</html>
