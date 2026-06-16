@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>Claude 長文要約プロンプト設計ツール</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 800px;
+    width: 1200px;
+  }
+  header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    padding: 28px 40px;
+    border-bottom: 1px solid #1e40af44;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #93c5fd;
+    letter-spacing: -0.5px;
+  }
+  header p {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 0;
+    height: calc(800px - 85px);
+  }
+  .sidebar {
+    background: #0f1e35;
+    border-right: 1px solid #1e40af33;
+    padding: 24px 20px;
+    overflow-y: auto;
+  }
+  .sidebar h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #475569;
+    margin-bottom: 14px;
+  }
+  .technique-btn {
+    width: 100%;
+    text-align: left;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #e2e8f0;
+  }
+  .technique-btn:hover { background: #263548; border-color: #3b82f6; }
+  .technique-btn.active {
+    background: #1d3461;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+  }
+  .technique-btn .tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 6px;
+  }
+  .tag-1 { background: #1d4ed8; color: #bfdbfe; }
+  .tag-2 { background: #7c3aed; color: #e9d5ff; }
+  .tag-3 { background: #065f46; color: #6ee7b7; }
+  .technique-btn .title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .technique-btn .desc {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+  .content {
+    padding: 24px 28px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .panel-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .panel {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-bad .panel-header { background: #450a0a; color: #fca5a5; border-bottom: 1px solid #7f1d1d; }
+  .panel-good .panel-header { background: #052e16; color: #6ee7b7; border-bottom: 1px solid #065f46; }
+  .panel-output .panel-header { background: #1e3a5f; color: #93c5fd; border-bottom: 1px solid #1e40af; }
+  .panel-prompt .panel-header { background: #3730a3; color: #c7d2fe; border-bottom: 1px solid #4f46e5; }
+  .panel pre, .panel .panel-body {
+    padding: 14px 16px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .panel pre { font-family: 'SF Mono', 'Courier New', monospace; color: #cbd5e1; }
+  .panel .panel-body { color: #94a3b8; }
+  .score-row {
+    display: flex;
+    gap: 12px;
+  }
+  .score-card {
+    flex: 1;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .score-card .label { font-size: 11px; color: #64748b; margin-bottom: 8px; }
+  .score-card .value { font-size: 28px; font-weight: 800; }
+  .score-card .bar { height: 4px; background: #334155; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .score-card .fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+  .fill-bad { background: #ef4444; }
+  .fill-good { background: #22c55e; }
+  .copy-btn {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    float: right;
+    margin-top: -4px;
+    transition: background 0.2s;
+  }
+  .copy-btn:hover { background: #1d4ed8; }
+  .copy-btn.copied { background: #065f46; }
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #475569;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude 長文要約 プロンプト設計ツール</h1>
+  <p>「NG例」と「改善例」を並べて比較 — 精度を劇的に上げる3つのテクニック</p>
+</header>
+<div class="main">
+  <div class="sidebar">
+    <h2>テクニックを選ぶ</h2>
+    <button class="technique-btn active" onclick="select(0)">
+      <div class="tag tag-1">Technique 1</div>
+      <div class="title">出力形式を指定する</div>
+      <div class="desc">「要約して」だけでは形式が毎回バラバラ。形式を明示すれば再現性が上がる。</div>
+    </button>
+    <button class="technique-btn" onclick="select(1)">
+      <div class="tag tag-2">Technique 2</div>
+      <div class="title">読者と目的を明示する</div>
+      <div class="desc">誰のための要約かを伝えることで、フォーカスポイントが最適化される。</div>
+    </button>
+    <button class="technique-btn" onclick="select(2)">
+      <div class="tag tag-3">Technique 3</div>
+      <div class="title">重要度の重みを指定する</div>
+      <div class="desc">何を重視するか伝えることで、重要な情報の取りこぼしがなくなる。</div>
+    </button>
+  </div>
+  <div class="content" id="content">
+  </div>
+</div>
+
+<script>
+const techniques = [
+  {
+    title: "出力形式を指定する",
+    ng_prompt: "以下の会議メモを要約してください。\n\n[会議メモ本文をここに貼り付け]",
+    ok_prompt: "以下の会議メモを要約してください。\n\n【出力形式】\n- 決定事項: 箇条書き3〜5点\n- アクションアイテム: 担当者と期限を含めた箇条書き\n- 次回議題候補: 1〜2点\n\n[会議メモ本文をここに貼り付け]",
+    ng_output: "今日の会議では製品ロードマップについて話し合いました。Q3の新機能についていくつかの意見が出され、デザインチームとエンジニアリングチームが協力して進めることになりました。リリース日は未定ですが、来月中には決定する予定です。",
+    ok_output: "【決定事項】\n• Q3新機能の開発を正式承認\n• デザイン・エンジニア合同チームを編成\n• 週次進捗MTGを毎週水曜13時に設定\n\n【アクションアイテム】\n• 田中（デザイン）: モックアップ作成 → 6/25まで\n• 鈴木（エンジニア）: 技術仕様書作成 → 6/30まで\n\n【次回議題候補】\n• リリース日の確定\n• QAテスト計画の策定",
+    ng_score: 42,
+    ok_score: 89,
+    ng_label: "再現性なし",
+    ok_label: "即アクション可能",
+  },
+  {
+    title: "読者と目的を明示する",
+    ng_prompt: "この論文を要約してください。\n\n[論文本文をここに貼り付け]",
+    ok_prompt: "この論文を要約してください。\n\n【読者】エンジニアではない経営陣（技術知識ゼロ）\n【目的】この研究に投資すべきか判断する材料として使用\n【文量】200字以内\n【注意】専門用語は使わず、ビジネスインパクトを中心に\n\n[論文本文をここに貼り付け]",
+    ng_output: "本研究では、トランスフォーマーアーキテクチャを基盤としたマルチモーダルLLMのファインチューニング手法について検討した。事前学習済みモデルにLoRAアダプタを適用することで、フルファインチューニング比15%のパラメータ更新でSOTA性能を達成した。",
+    ok_output: "【一言で言うと】\nAIの精度を、従来の15%のコストで同等まで高める手法の研究です。\n\n【ビジネス価値】\n• 開発コストを最大85%削減できる可能性\n• 中小企業でも高精度AIを導入しやすくなる\n• 既存システムへの後付け改善が可能\n\n【投資判断のポイント】\n技術的リスクは低く、市場への応用可能性は高いと言えます。",
+    ng_score: 38,
+    ok_score: 92,
+    ng_label: "読者不一致",
+    ok_label: "意思決定に直結",
+  },
+  {
+    title: "重要度の重みを指定する",
+    ng_prompt: "この契約書を要約してください。\n\n[契約書本文をここに貼り付け]",
+    ok_prompt: "この契約書を要約してください。\n\n【最重要（必ず含める）】\n① 解約条件と違約金\n② 自動更新の有無と停止期限\n③ 責任範囲の限定条項\n\n【重要（含めてほしい）】\n• 支払いサイト・遅延損害金\n• 機密保持の範囲\n\n【省略可】\n• 一般的な表明保証条項\n\n[契約書本文をここに貼り付け]",
+    ng_output: "本契約は甲乙間のSaaS利用に関するものです。サービス内容は第2条に定める通りとし、利用料金は月額XX円です。知的財産権は甲に帰属し、乙は本サービスを第三者に転売することはできません。本契約の有効期間は1年間とします。",
+    ok_output: "⚠️ 解約条件と違約金\n→ 中途解約時は残存期間の50%を違約金として請求。\n　 注意：解約申請は期間終了60日前まで。\n\n🔄 自動更新\n→ あり。停止期限：契約満了90日前。見落とし注意！\n\n🛡️ 責任範囲の限定\n→ 損害賠償は月額利用料の3ヶ月分が上限。\n\n💳 支払いサイト\n→ 翌月末払い。遅延損害金：年利14.6%",
+    ng_score: 35,
+    ok_score: 94,
+    ng_label: "重要情報が埋もれる",
+    ok_label: "リスク即把握",
+  }
+];
+
+let current = 0;
+
+function select(i) {
+  current = i;
+  document.querySelectorAll('.technique-btn').forEach((b, idx) => {
+    b.classList.toggle('active', idx === i);
+  });
+  render();
+}
+
+function render() {
+  const t = techniques[current];
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div>
+      <div class="section-title">比較: NGプロンプト vs 改善プロンプト</div>
+      <div class="panel-row">
+        <div class="panel panel-bad">
+          <div class="panel-header">
+            ❌ NGプロンプト
+          </div>
+          <pre>${t.ng_prompt}</pre>
+        </div>
+        <div class="panel panel-good">
+          <div class="panel-header">
+            ✅ 改善プロンプト
+            <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">コピー</button>
+          </div>
+          <pre id="okPromptText">${t.ok_prompt}</pre>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Claudeの出力結果</div>
+      <div class="panel-row">
+        <div class="panel panel-bad">
+          <div class="panel-header">❌ NGプロンプトの出力</div>
+          <pre>${t.ng_output}</pre>
+        </div>
+        <div class="panel panel-good">
+          <div class="panel-header">✅ 改善プロンプトの出力</div>
+          <pre>${t.ok_output}</pre>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">実用スコア比較</div>
+      <div class="score-row">
+        <div class="score-card">
+          <div class="label">❌ NG: ${t.ng_label}</div>
+          <div class="value" style="color:#ef4444">${t.ng_score}<span style="font-size:14px;color:#64748b">/100</span></div>
+          <div class="bar"><div class="fill fill-bad" style="width:${t.ng_score}%"></div></div>
+        </div>
+        <div class="score-card">
+          <div class="label">✅ 改善後: ${t.ok_label}</div>
+          <div class="value" style="color:#22c55e">${t.ok_score}<span style="font-size:14px;color:#64748b">/100</span></div>
+          <div class="bar"><div class="fill fill-good" style="width:${t.ok_score}%"></div></div>
+        </div>
+        <div class="score-card" style="flex:0.6">
+          <div class="label">精度向上</div>
+          <div class="value" style="color:#f59e0b">+${t.ok_score - t.ng_score}<span style="font-size:14px;color:#64748b">pts</span></div>
+          <div class="bar"><div class="fill" style="width:${t.ok_score - t.ng_score}%;background:#f59e0b"></div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function copyPrompt() {
+  const t = techniques[current];
+  navigator.clipboard.writeText(t.ok_prompt).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'コピー済！';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
