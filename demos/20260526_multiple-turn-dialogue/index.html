@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1200" />
+  <title>複数ターン対話 設計シミュレーター</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      color: #e2e8f0;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 6px;
+      background: linear-gradient(90deg, #a78bfa, #60a5fa, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .main-container {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      width: 100%;
+      max-width: 1160px;
+    }
+
+    /* ── 左パネル：コンテキスト設計 ── */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #a78bfa;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .scenario-btn {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(167,139,250,0.3);
+      background: rgba(167,139,250,0.08);
+      color: #c4b5fd;
+      font-size: 0.82rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .scenario-btn:hover, .scenario-btn.active {
+      background: rgba(167,139,250,0.22);
+      border-color: #a78bfa;
+      color: #ede9fe;
+    }
+
+    .scenario-btn:last-child { margin-bottom: 0; }
+
+    .pattern-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .pattern-chip {
+      padding: 7px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(96,165,250,0.3);
+      background: rgba(96,165,250,0.07);
+      color: #93c5fd;
+      font-size: 0.75rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pattern-chip:hover, .pattern-chip.active {
+      background: rgba(96,165,250,0.22);
+      border-color: #60a5fa;
+      color: #bfdbfe;
+    }
+
+    .context-score {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+
+    .score-label { color: #94a3b8; }
+
+    .score-bar-wrap {
+      width: 100px;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.5s ease;
+    }
+
+    .score-val {
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      width: 28px;
+      text-align: right;
+    }
+
+    /* ── 右パネル：会話エリア ── */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .conversation-area {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 20px;
+      min-height: 360px;
+      max-height: 420px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .conversation-area::-webkit-scrollbar { width: 4px; }
+    .conversation-area::-webkit-scrollbar-track { background: transparent; }
+    .conversation-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
+
+    .turn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      animation: fadeSlideIn 0.3s ease;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .turn-number {
+      font-size: 0.7rem;
+      color: #64748b;
+      padding: 2px 8px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 99px;
+      width: fit-content;
+    }
+
+    .bubble {
+      padding: 11px 15px;
+      border-radius: 12px;
+      font-size: 0.84rem;
+      line-height: 1.65;
+      max-width: 90%;
+    }
+
+    .bubble-user {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #ede9fe;
+      align-self: flex-end;
+      border-bottom-right-radius: 3px;
+    }
+
+    .bubble-assistant {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #e2e8f0;
+      align-self: flex-start;
+      border-bottom-left-radius: 3px;
+    }
+
+    .bubble-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      opacity: 0.7;
+    }
+
+    .context-badge {
+      display: inline-block;
+      background: rgba(52,211,153,0.15);
+      border: 1px solid rgba(52,211,153,0.3);
+      color: #6ee7b7;
+      font-size: 0.68rem;
+      padding: 2px 7px;
+      border-radius: 99px;
+      margin-top: 6px;
+    }
+
+    /* ── 入力エリア ── */
+    .input-area {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .input-field {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 60px;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus { border-color: #a78bfa; }
+    .input-field::placeholder { color: #475569; }
+
+    .send-btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: white;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      height: 60px;
+      min-width: 80px;
+    }
+
+    .send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.4); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .quick-prompts {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .quick-chip {
+      padding: 5px 11px;
+      border-radius: 99px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+      color: #94a3b8;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quick-chip:hover {
+      background: rgba(167,139,250,0.15);
+      border-color: rgba(167,139,250,0.4);
+      color: #c4b5fd;
+    }
+
+    /* ── 評価パネル ── */
+    .eval-panel {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+
+    .eval-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #34d399;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .eval-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .eval-item {
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .eval-metric {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .eval-value {
+      font-size: 1.3rem;
+      font-weight: 800;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      gap: 10px;
+      color: #475569;
+    }
+
+    .empty-icon { font-size: 2.5rem; }
+
+    .tip-box {
+      background: rgba(167,139,250,0.08);
+      border: 1px solid rgba(167,139,250,0.2);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #c4b5fd;
+      line-height: 1.55;
+    }
+
+    .tip-label {
+      font-weight: 700;
+      color: #a78bfa;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔄 複数ターン対話 設計シミュレーター</h1>
+<p class="subtitle">コンテキスト継続パターンを試して、会話精度がどう変わるか体験しよう</p>
+
+<div class="main-container">
+
+  <!-- ── 左パネル ── -->
+  <div class="left-panel">
+
+    <div class="card">
+      <div class="card-title">📂 シナリオ選択</div>
+      <button class="scenario-btn active" data-scenario="report">
+        📄 レポート作成<br><small style="opacity:.7">段階的に深掘りする</small>
+      </button>
+      <button class="scenario-btn" data-scenario="debug">
+        🐛 コードデバッグ<br><small style="opacity:.7">原因を絞り込む</small>
+      </button>
+      <button class="scenario-btn" data-scenario="brainstorm">
+        💡 アイデア出し<br><small style="opacity:.7">発散→収束→実装</small>
+      </button>
+      <button class="scenario-btn" data-scenario="translate">
+        🌐 翻訳＆校正<br><small style="opacity:.7">条件を追加しながら改善</small>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚙️ コンテキスト継続パターン</div>
+      <div class="pattern-grid">
+        <div class="pattern-chip active" data-pattern="explicit">明示的参照</div>
+        <div class="pattern-chip" data-pattern="progressive">段階的深化</div>
+        <div class="pattern-chip" data-pattern="roleplay">ロール固定</div>
+        <div class="pattern-chip" data-pattern="constraint">制約追加</div>
+      </div>
+      <div class="tip-box" id="pattern-tip" style="margin-top:10px">
+        <span class="tip-label">💡 明示的参照:</span>「先ほどの〇〇について」と前のターンを明示的に引用することで、文脈の引き継ぎ精度が向上します。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 文脈スコア</div>
+      <div class="context-score" id="context-scores">
+        <div class="score-row">
+          <span class="score-label">文脈継続性</span>
+          <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%;background:linear-gradient(90deg,#a78bfa,#60a5fa)"></div></div>
+          <span class="score-val" id="score-continuity">0%</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">指示の明確さ</span>
+          <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%;background:linear-gradient(90deg,#34d399,#60a5fa)"></div></div>
+          <span class="score-val" id="score-clarity">0%</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">深化の進行度</span>
+          <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%;background:linear-gradient(90deg,#f59e0b,#ef4444)"></div></div>
+          <span class="score-val" id="score-depth">0%</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">出力品質期待値</span>
+          <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%;background:linear-gradient(90deg,#ec4899,#f59e0b)"></div></div>
+          <span class="score-val" id="score-quality">0%</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 右パネル ── -->
+  <div class="right-panel">
+
+    <div class="conversation-area" id="conv-area">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">💬</div>
+        <div>シナリオを選んで会話を始めてみよう</div>
+        <div style="font-size:0.78rem">クイックプロンプトをクリックすると自動入力されます</div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-row">
+        <textarea
+          class="input-field"
+          id="user-input"
+          placeholder="Claudeへのメッセージを入力..."
+        ></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">送信</button>
+      </div>
+      <div class="quick-prompts" id="quick-prompts"></div>
+    </div>
+
+    <div class="eval-panel">
+      <div class="eval-title">🎯 会話品質メトリクス</div>
+      <div class="eval-grid">
+        <div class="eval-item">
+          <div class="eval-metric">ターン数</div>
+          <div class="eval-value" id="metric-turns" style="color:#a78bfa">0</div>
+        </div>
+        <div class="eval-item">
+          <div class="eval-metric">コンテキスト活用</div>
+          <div class="eval-value" id="metric-ctx" style="color:#60a5fa">なし</div>
+        </div>
+        <div class="eval-item">
+          <div class="eval-metric">推定品質スコア</div>
+          <div class="eval-value" id="metric-score" style="color:#34d399">-</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ─── データ ─── */
+const scenarios = {
+  report: {
+    name: 'レポート作成',
+    turns: [
+      {
+        user: '市場調査レポートを書きたいです。テーマは「2026年のAI活用トレンド」です。まず構成案を教えてください。',
+        assistant: '承知しました。「2026年のAI活用トレンド」市場調査レポートの構成案をご提案します。\n\n**📋 推奨構成**\n1. エグゼクティブサマリー（1ページ）\n2. 市場概況と成長率予測\n3. 業種別AI活用事例TOP5\n4. 技術トレンド分析（LLM・エージェント・マルチモーダル）\n5. 課題とリスク要因\n6. 2027年以降の展望\n\nこの構成でよろしいでしょうか？特に深掘りしたい章はありますか？',
+        context: '構成の土台を確立'
+      },
+      {
+        user: '先ほどの構成の「3. 業種別AI活用事例TOP5」を詳しく書いてください。特に医療・製造・金融に焦点を当てて。',
+        assistant: '**3. 業種別AI活用事例TOP5（詳細版）**\n\n**🏥 医療分野**\n- 画像診断AIによる早期発見率が従来比+34%向上\n- 電子カルテの自動要約で医師の事務負担を60%削減\n\n**🏭 製造分野**\n- 予知保全AIで設備停止コストを年間平均28%削減\n- 品質検査自動化で不良品検出精度99.2%を達成\n\n**💰 金融分野**\n- 不正検知AIでチャージバック損失を45%抑制\n- 融資審査の自動化で申請から承認まで72時間→2時間へ短縮\n\n※前の構成の第3章として位置づけています。次はどの章を展開しますか？',
+        context: '前章の参照 + 深化'
+      },
+      {
+        user: '今書いてもらった内容をもとに、エグゼクティブサマリー（第1章）を200字以内で書いてください。医療・製造・金融のポイントを盛り込んで。',
+        assistant: '**1. エグゼクティブサマリー**\n\n2026年、AIは医療・製造・金融の三分野で実用フェーズに突入した。医療では画像診断AIが早期発見率を34%向上させ、製造では予知保全が停止コストを28%削減。金融では不正検知と審査自動化が業務効率を抜本的に改善している。業種横断で「コスト削減」と「品質向上」の同時達成が実証され、AI投資ROIは平均3.2倍に達する見通しだ。\n\n（197字）\n\n✅ 第3章の内容を第1章に凝縮しました。レポート全体の一貫性が保たれています。',
+        context: '複数ターンの情報を統合'
+      }
+    ],
+    quickPrompts: [
+      '市場調査レポートの構成案を教えてください',
+      '先ほどの第3章を詳しく書いてください',
+      '今の内容をサマリーにまとめて',
+      '別の視点でもう一度提案して'
+    ]
+  },
+  debug: {
+    name: 'コードデバッグ',
+    turns: [
+      {
+        user: 'Pythonコードでエラーが出ています。\n```\nTypeError: unsupported operand type(s) for +: "int" and "str"\n```\nどういう意味ですか？',
+        assistant: '`TypeError`は**型の不一致**が原因です。\n\n整数（`int`）と文字列（`str`）を`+`演算子で結合しようとしています。Pythonは型を自動変換しないため、このエラーが発生します。\n\n**よくある原因例:**\n```python\nage = 25\nprint("年齢: " + age)  # ❌ エラー\nprint("年齢: " + str(age))  # ✅ OK\n```\n\n実際のコードを貼っていただけますか？原因箇所を特定します。',
+        context: 'エラーの概念を把握'
+      },
+      {
+        user: `コードはこれです：
+\`\`\`python
+score = int(input("点数を入力: "))
+result = "あなたの点数は" + score + "点です"
+print(result)
+\`\`\``,
+        assistant: '原因が特定できました！先ほど説明した型の不一致がまさにここで起きています。\n\n**🐛 問題箇所:**\n```python\nresult = "あなたの点数は" + score + "点です"\n#                          ^^^^^ intなのでエラー\n```\n\n**✅ 修正版（3パターン）:**\n```python\n# 方法1: str()で変換\nresult = "あなたの点数は" + str(score) + "点です"\n\n# 方法2: f-string（推奨）\nresult = f"あなたの点数は{score}点です"\n\n# 方法3: format()\nresult = "あなたの点数は{}点です".format(score)\n```\n\nf-stringが最も読みやすいのでおすすめです。試してみてください！',
+        context: '前の概念 + コードに適用'
+      },
+      {
+        user: 'f-stringに直したら動きました！ありがとうございます。ついでに、入力値が数字以外だった場合のエラーハンドリングも追加してもらえますか？',
+        assistant: '動作確認できて良かったです！今のコードに`try-except`でバリデーションを追加します。\n\n**✅ 完成版コード:**\n```python\nwhile True:\n    try:\n        score = int(input("点数を入力 (0-100): "))\n        if not 0 <= score <= 100:\n            print("⚠️ 0から100の範囲で入力してください")\n            continue\n        break\n    except ValueError:\n        print("⚠️ 数字を入力してください")\n\nresult = f"あなたの点数は{score}点です"\nprint(result)\n```\n\n**追加した機能:**\n- 文字入力 → `ValueError`をキャッチして再入力を促す\n- 範囲外の数値 → 警告して再入力\n- `while True`ループで正しい入力まで繰り返す',
+        context: '動作確認 + 機能拡張'
+      }
+    ],
+    quickPrompts: [
+      'TypeErrorが出ています',
+      'コードを貼るので原因を教えて',
+      'エラーハンドリングも追加して',
+      'もっとシンプルに書けますか？'
+    ]
+  },
+  brainstorm: {
+    name: 'アイデア出し',
+    turns: [
+      {
+        user: 'スタートアップのサービス名をブレストしてください。AIを使った睡眠改善アプリです。ユニークで覚えやすい名前を10個提案して。',
+        assistant: '睡眠×AIのサービス名、10案提案します！\n\n**🌙 ブランド感のある名前**\n1. **SleepLens** - AIが睡眠を「見える化」するイメージ\n2. **DreamPilot** - AIが夢の質を操縦\n3. **NoctAI** - nocturn（夜）+ AI の造語\n\n**🧠 機能訴求型**\n4. **DeepRest** - 深い休息を実現\n5. **SlumberMind** - 心と眠りの融合\n6. **SnoozeSense** - センサーで感知するスマート睡眠\n\n**🎯 シンプル・覚えやすい**\n7. **Lunara** - luna（月）+ -ra の造語\n8. **Zleep** - Z（睡眠記号）+ sleep\n9. **Oremus** - ラテン語「休もう」の意\n10. **SilentAI** - 静寂 × AI\n\nどのタイプが刺さりますか？方向性を絞ってさらに深めます！',
+        context: '幅広く発散'
+      },
+      {
+        user: '「Lunara」と「Zleep」が気に入りました。この2つをベースにロゴのコンセプトとキャッチコピーも考えてもらえますか？',
+        assistant: '先ほどの2案を深掘りします！\n\n**🌕 Lunara**\n- ロゴコンセプト: 三日月が微笑むシンプルなアイコン。グラデーション（深夜ブルー→暁の紫）。フォントは丸みのあるサンセリフ\n- キャッチコピー案:\n  - 「あなたの夜を、科学する。」\n  - 「月明かりより、賢い眠りを。」\n  - 「睡眠の質が、人生を変える。」\n\n**⚡ Zleep**\n- ロゴコンセプト: Zの文字が波形グラフを描く。ネオンカラー（Electric Blue）でテック感を演出\n- キャッチコピー案:\n  - 「AIと眠れ。朝が変わる。」\n  - 「ただ寝るな。スマートに眠れ。」\n  - 「Zだけが知っている、理想の眠り。」\n\nどちらのブランドが御社のターゲット層に合いそうですか？',
+        context: '前の候補を参照 + 展開'
+      },
+      {
+        user: 'Lunaraで行きます！次は想定ユーザーペルソナを3パターン作成してください。先ほどのブランドイメージに合わせて。',
+        assistant: '**Lunaraブランドに合致する3ペルソナ**\n\n**👩‍💻 ペルソナA「キャリア佐藤さん」（32歳・女性）**\n- 都内IT企業のPM。残業続きで睡眠が浅い\n- 「科学的根拠」と「データ可視化」に響く\n- Lunara訴求ポイント: 睡眠スコアと改善提案\n\n**👨‍👩‍👧 ペルソナB「育児中の田中さん」（35歳・男性）**\n- 子供の夜泣きで分断睡眠が慢性化\n- 「短時間でも質の高い睡眠」を求める\n- Lunara訴求ポイント: 睡眠断片化の最適化機能\n\n**🎓 ペルソナC「学生の山田さん」（21歳・男性）**\n- 試験前の追い込みで生活リズムが崩壊\n- コスパと手軽さを重視\n- Lunara訴求ポイント: 学習効率を上げる睡眠設計\n\n✅ Lunaraの「月×科学」イメージで3層を獲得できる設計です。MVPはどのペルソナから着手しますか？',
+        context: '選定結果 + ブランド定義を統合'
+      }
+    ],
+    quickPrompts: [
+      'AIアプリの名前を10個提案して',
+      '気に入った2つを深掘りして',
+      'ブランドに合ったペルソナを作って',
+      'MVPで作るべき機能を優先順位付けして'
+    ]
+  },
+  translate: {
+    name: '翻訳＆校正',
+    turns: [
+      {
+        user: '以下を英語に翻訳してください。\n「私たちのAIは、あなたの業務効率を劇的に改善します。」',
+        assistant: '翻訳結果をお届けします。\n\n**📝 直訳版:**\n"Our AI dramatically improves your work efficiency."\n\n**💼 ビジネス向け（フォーマル）:**\n"Our AI solution significantly enhances your operational efficiency."\n\n**🚀 マーケティング向け（インパクト重視）:**\n"Our AI transforms the way you work — dramatically."\n\nご用途に合わせてどれを採用しますか？また、トーンや長さの調整が必要であればお知らせください。',
+        context: '基本翻訳を確立'
+      },
+      {
+        user: '「マーケティング向け」を採用します。これをプレスリリース冒頭の1段落として、もう少し長く、数値を含めてもらえますか？',
+        assistant: '選んでいただいた「マーケティング向け」をベースに拡張します。\n\n**📰 プレスリリース冒頭（英語版）:**\n\n> Our AI transforms the way you work — dramatically. Businesses adopting our platform report a **40% reduction in manual tasks** and a **3x increase in team productivity** within just 90 days. From intelligent document processing to real-time decision support, our AI is engineered to eliminate inefficiencies and unlock your team\'s full potential.\n\n**日本語対訳:**\n> 私たちのAIは、あなたの仕事のあり方を劇的に変えます。導入企業の報告によると、わずか90日以内に手作業が**40%削減**され、チームの生産性が**3倍**に向上しています。インテリジェントな文書処理からリアルタイムの意思決定支援まで、業務の非効率を排除し、チームの潜在力を最大限に引き出すために設計されています。\n\n数値は仮の例示です。実際の数値に差し替えてご使用ください。',
+        context: '前選択 + 要件追加'
+      },
+      {
+        user: '完璧です！最後に、このプレスリリースの見出し（ヘッドライン）を英語で3パターン考えてください。SEOも意識して。',
+        assistant: '今作成したプレスリリースの内容に合わせた見出し3案です。\n\n**🎯 SEO × インパクト重視のヘッドライン:**\n\n**① 数値訴求型（CTR最大化）**\n> "AI Platform Cuts Manual Work by 40% and Triples Team Productivity in 90 Days"\n- キーワード: AI platform, productivity, manual work\n\n**② 課題解決型（検索意図に刺さる）**\n> "How Businesses Are Using AI to Eliminate Inefficiencies and Scale Operations Fast"\n- キーワード: AI, business efficiency, scale operations\n\n**③ ブランド権威型（信頼構築）**\n> "The Future of Work Is Here: Meet the AI That\'s Transforming Productivity for Enterprises Worldwide"\n- キーワード: future of work, AI, enterprise productivity\n\n✅ 本文「Our AI transforms the way you work」のトーンと統一されています。A/Bテストで試すことをお勧めします！',
+        context: '全ターンの成果物を参照'
+      }
+    ],
+    quickPrompts: [
+      '翻訳してください',
+      'マーケティング向けに改善して',
+      '数値を入れて拡張して',
+      'SEO対応の見出しを作って'
+    ]
+  }
+};
+
+const patternTips = {
+  explicit: '<span class="tip-label">💡 明示的参照:</span>「先ほどの〇〇について」と前のターンを明示的に引用することで、文脈の引き継ぎ精度が向上します。',
+  progressive: '<span class="tip-label">🔄 段階的深化:</span>最初は広く、徐々に範囲を絞る。各ターンで1つの要素を深掘りすることで、全体の質が高まります。',
+  roleplay: '<span class="tip-label">🎭 ロール固定:</span>「あなたはエキスパートの〇〇として」と役割を最初に設定すると、全ターンで一貫したトーンが保たれます。',
+  constraint: '<span class="tip-label">⚙️ 制約追加:</span>ターンごとに「200字以内で」「箇条書きで」などの制約を追加することで、出力の形式をコントロールできます。'
+};
+
+/* ─── 状態 ─── */
+let currentScenario = 'report';
+let currentPattern = 'explicit';
+let currentTurn = 0;
+let scores = { continuity: 0, clarity: 0, depth: 0, quality: 0 };
+
+/* ─── 初期化 ─── */
+function init() {
+  // シナリオボタン
+  document.querySelectorAll('.scenario-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentScenario = btn.dataset.scenario;
+      resetConversation();
+    });
+  });
+
+  // パターンチップ
+  document.querySelectorAll('.pattern-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.pattern-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentPattern = chip.dataset.pattern;
+      document.getElementById('pattern-tip').innerHTML = patternTips[currentPattern];
+    });
+  });
+
+  loadQuickPrompts();
+}
+
+function resetConversation() {
+  currentTurn = 0;
+  scores = { continuity: 0, clarity: 0, depth: 0, quality: 0 };
+  document.getElementById('conv-area').innerHTML = `
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">💬</div>
+      <div>シナリオを選んで会話を始めてみよう</div>
+      <div style="font-size:0.78rem">クイックプロンプトをクリックすると自動入力されます</div>
+    </div>`;
+  updateMetrics();
+  updateScoreBars();
+  loadQuickPrompts();
+}
+
+function loadQuickPrompts() {
+  const sc = scenarios[currentScenario];
+  const container = document.getElementById('quick-prompts');
+  container.innerHTML = sc.quickPrompts.map(p =>
+    `<div class="quick-chip" onclick="fillInput(this)">${p}</div>`
+  ).join('');
+}
+
+function fillInput(el) {
+  document.getElementById('user-input').value = el.textContent;
+  document.getElementById('user-input').focus();
+}
+
+/* ─── 送信 ─── */
+function sendMessage() {
+  const input = document.getElementById('user-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const sc = scenarios[currentScenario];
+  const convArea = document.getElementById('conv-area');
+  const emptyState = document.getElementById('empty-state');
+  if (emptyState) emptyState.remove();
+
+  // ユーザーバブル
+  const turnGroup = document.createElement('div');
+  turnGroup.className = 'turn-group';
+  turnGroup.innerHTML = `
+    <div class="turn-number">ターン ${currentTurn + 1}</div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end">
+      <div class="bubble-label" style="color:#a78bfa;text-align:right">You</div>
+      <div class="bubble bubble-user">${escapeHtml(text).replace(/\n/g,'<br>')}</div>
+    </div>`;
+  convArea.appendChild(turnGroup);
+
+  input.value = '';
+
+  // アシスタント応答（シナリオのターンを使用 or フォールバック）
+  const turnData = sc.turns[currentTurn];
+  setTimeout(() => {
+    const assistantDiv = document.createElement('div');
+    assistantDiv.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start';
+
+    if (turnData) {
+      assistantDiv.innerHTML = `
+        <div class="bubble-label" style="color:#34d399">Claude</div>
+        <div class="bubble bubble-assistant">
+          ${formatMarkdown(turnData.assistant)}
+          <div><span class="context-badge">📌 ${turnData.context}</span></div>
+        </div>`;
+    } else {
+      assistantDiv.innerHTML = `
+        <div class="bubble-label" style="color:#34d399">Claude</div>
+        <div class="bubble bubble-assistant">
+          ✅ ご質問を受け取りました。複数ターンの対話では、前のメッセージの文脈を引き継いで回答します。<br><br>
+          実際のClaudeでは、この会話の流れを記憶して、より精度の高い回答を提供します。
+          <div><span class="context-badge">📌 文脈の継続</span></div>
+        </div>`;
+    }
+
+    turnGroup.appendChild(assistantDiv);
+    convArea.scrollTop = convArea.scrollHeight;
+    currentTurn++;
+    updateScores();
+    updateMetrics();
+  }, 600);
+
+  convArea.scrollTop = convArea.scrollHeight;
+}
+
+/* ─── スコア更新 ─── */
+function updateScores() {
+  const progress = Math.min(currentTurn / 3, 1);
+  const patternBonus = { explicit: 15, progressive: 10, roleplay: 8, constraint: 12 };
+  const bonus = patternBonus[currentPattern] || 10;
+
+  scores.continuity = Math.min(100, Math.round(20 + progress * 60 + bonus));
+  scores.clarity    = Math.min(100, Math.round(30 + progress * 50 + bonus * 0.8));
+  scores.depth      = Math.min(100, Math.round(10 + progress * 70 + bonus * 0.6));
+  scores.quality    = Math.min(100, Math.round(25 + progress * 55 + bonus * 0.9));
+  updateScoreBars();
+}
+
+function updateScoreBars() {
+  const keys = ['continuity', 'clarity', 'depth', 'quality'];
+  const ids   = ['score-continuity', 'score-clarity', 'score-depth', 'score-quality'];
+  const bars  = document.querySelectorAll('.score-bar-fill');
+  keys.forEach((k, i) => {
+    const v = scores[k];
+    bars[i].style.width = v + '%';
+    document.getElementById(ids[i]).textContent = v + '%';
+  });
+}
+
+function updateMetrics() {
+  document.getElementById('metric-turns').textContent = currentTurn;
+  const ctxMap = { explicit: '明示的', progressive: '段階的', roleplay: 'ロール固定', constraint: '制約型' };
+  document.getElementById('metric-ctx').textContent = currentTurn > 0 ? ctxMap[currentPattern] : 'なし';
+  const avg = currentTurn > 0
+    ? Math.round((scores.continuity + scores.clarity + scores.depth + scores.quality) / 4)
+    : 0;
+  document.getElementById('metric-score').textContent = currentTurn > 0 ? avg + 'pt' : '-';
+}
+
+/* ─── ユーティリティ ─── */
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatMarkdown(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;font-family:monospace">$1</code>')
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin:6px 0;overflow-x:auto;font-size:0.78rem;font-family:monospace;white-space:pre-wrap">$1</pre>')
+    .replace(/\n/g, '<br>');
+}
+
+// Enterキーで送信（Shift+Enterは改行）
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  document.getElementById('user-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+});
+</script>
+</body>
+</html>
