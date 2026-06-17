@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 爆速開発デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+    border-bottom: 1px solid #30363d;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f0883e;
+    letter-spacing: 0.5px;
+  }
+
+  .badge {
+    background: #1f3a1f;
+    color: #3fb950;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid #3fb950;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .panel-header .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  .dot-green { background: #3fb950; }
+  .dot-blue  { background: #58a6ff; }
+  .dot-orange{ background: #f0883e; }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    border-right: 1px solid #30363d;
+  }
+
+  .panel-body:last-child { border-right: none; }
+
+  /* Left panel – task input */
+  .task-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 8px;
+  }
+
+  .tab {
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    color: #8b949e;
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all .15s;
+  }
+
+  .tab.active {
+    background: #1f2d3d;
+    color: #58a6ff;
+    border-color: #30363d;
+  }
+
+  .task-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .task-card:hover, .task-card.selected {
+    border-color: #58a6ff;
+    background: #1a2535;
+  }
+
+  .task-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+
+  .label-gen   { color: #3fb950; }
+  .label-debug { color: #f85149; }
+  .label-ref   { color: #a371f7; }
+
+  .task-title { font-size: 13px; color: #e6edf3; margin-bottom: 4px; }
+  .task-desc  { font-size: 11px; color: #6e7681; line-height: 1.4; }
+
+  .run-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #238636, #1a6b2a);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .run-btn:hover { background: linear-gradient(135deg, #2ea043, #238636); transform: translateY(-1px); }
+
+  /* Right panel – output */
+  .output-area {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .output-line {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 2px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity .3s, transform .3s;
+  }
+
+  .output-line.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .line-type {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .type-cmd   { color: #3fb950; }
+  .type-info  { color: #58a6ff; }
+  .type-warn  { color: #f0883e; }
+  .type-ok    { color: #3fb950; }
+  .type-code  { color: #a371f7; }
+  .type-err   { color: #f85149; }
+
+  .line-content { color: #c9d1d9; flex: 1; }
+  .line-content.dim { color: #6e7681; }
+  .line-content code {
+    background: #1f2937;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #a371f7;
+    font-size: 11px;
+  }
+
+  .typing-cursor {
+    display: inline-block;
+    width: 8px; height: 14px;
+    background: #3fb950;
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .stats-bar {
+    background: #1a2535;
+    border-top: 1px solid #30363d;
+    padding: 8px 16px;
+    display: flex;
+    gap: 24px;
+    font-size: 11px;
+  }
+
+  .stat { display: flex; align-items: center; gap: 6px; color: #8b949e; }
+  .stat-val { color: #c9d1d9; font-weight: 600; }
+  .stat-dot { width: 6px; height: 6px; border-radius: 50%; background: #3fb950; }
+
+  .progress-bar {
+    height: 3px;
+    background: #30363d;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0 -16px;
+    margin-bottom: 8px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1f6feb, #58a6ff);
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .diff-block {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 8px 0;
+    font-family: 'Cascadia Code', monospace;
+    font-size: 11px;
+  }
+
+  .diff-header { background: #1f2d3d; padding: 6px 12px; color: #58a6ff; font-size: 10px; }
+  .diff-line { padding: 2px 12px; line-height: 1.5; }
+  .diff-add { background: #0d2a0d; color: #3fb950; }
+  .diff-del { background: #2a0d0d; color: #f85149; }
+  .diff-ctx { color: #6e7681; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">⚡ Claude Code</span>
+  <span class="badge">LIVE DEMO</span>
+  <span style="margin-left:auto; font-size:12px; color:#6e7681;">開発自動化シミュレーター</span>
+</header>
+
+<div class="main">
+  <!-- Left: Task Input -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot dot-blue"></span>
+      タスク選択
+    </div>
+    <div class="panel-body" id="taskPanel">
+      <div class="task-tabs">
+        <div class="tab active">全タスク</div>
+        <div class="tab">コード生成</div>
+        <div class="tab">デバッグ</div>
+        <div class="tab">リファクタ</div>
+      </div>
+
+      <div class="task-card selected" onclick="selectTask(0)" id="task0">
+        <div class="task-label label-gen">▶ コード生成</div>
+        <div class="task-title">REST APIエンドポイント生成</div>
+        <div class="task-desc">ユーザー認証付きのCRUD APIを自動生成。バリデーション・エラーハンドリング込み</div>
+      </div>
+
+      <div class="task-card" onclick="selectTask(1)" id="task1">
+        <div class="task-label label-debug">🔍 デバッグ</div>
+        <div class="task-title">非同期処理のバグを検出・修正</div>
+        <div class="task-desc">Promise.all競合状態を特定し、適切なエラーハンドリングに修正</div>
+      </div>
+
+      <div class="task-card" onclick="selectTask(2)" id="task2">
+        <div class="task-label label-ref">♻ リファクタリング</div>
+        <div class="task-title">レガシーコードをモダン化</div>
+        <div class="task-desc">コールバック地獄をasync/awaitに変換し、可読性・保守性を向上</div>
+      </div>
+
+      <button class="run-btn" onclick="runDemo()">
+        ▶ Claude Code を実行
+      </button>
+    </div>
+  </div>
+
+  <!-- Right: Output -->
+  <div class="panel" style="border-left:1px solid #30363d;">
+    <div class="panel-header">
+      <span class="dot dot-green" id="statusDot"></span>
+      <span id="statusLabel">出力ログ</span>
+    </div>
+    <div class="panel-body" id="outputPanel">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="output-area" id="outputArea">
+        <div class="output-line visible">
+          <span class="line-type type-info">ℹ</span>
+          <span class="line-content dim">タスクを選択して「Claude Code を実行」をクリックしてください</span>
+        </div>
+      </div>
+    </div>
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-dot"></span><span>処理時間</span><span class="stat-val" id="statTime">—</span></div>
+      <div class="stat"><span>生成行数</span><span class="stat-val" id="statLines">—</span></div>
+      <div class="stat"><span>削除行数</span><span class="stat-val" id="statDel">—</span></div>
+      <div class="stat"><span>テスト</span><span class="stat-val" id="statTests">—</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedTask = 0;
+let running = false;
+
+const tasks = [
+  {
+    type: 'gen',
+    sequences: [
+      { t:0,   icon:'▶', cls:'type-cmd',  text:'claude code "REST API for User CRUD with JWT auth"' },
+      { t:400, icon:'ℹ', cls:'type-info', text:'タスク解析中… 要件: 認証 + CRUD + バリデーション' },
+      { t:900, icon:'ℹ', cls:'type-info', text:'コード生成プラン: controllers / routes / middleware / tests' },
+      { t:1400,icon:'⚙', cls:'type-code', text:'生成中: <code>src/controllers/userController.ts</code>' },
+      { t:1700,icon:'⚙', cls:'type-code', text:'生成中: <code>src/routes/userRoutes.ts</code>' },
+      { t:2000,icon:'⚙', cls:'type-code', text:'生成中: <code>src/middleware/auth.ts</code>' },
+      { t:2400,icon:'⚙', cls:'type-code', text:'生成中: <code>src/validators/userValidator.ts</code>' },
+      { t:2800,icon:'⚙', cls:'type-code', text:'生成中: <code>tests/user.test.ts</code> (12ケース)' },
+      { t:3200,icon:'✔', cls:'type-ok',   text:'コード生成完了 — 247行, テスト12件 ✨', diff: true },
+      { t:3600,icon:'▶', cls:'type-cmd',  text:'npm test -- --coverage' },
+      { t:4000,icon:'✔', cls:'type-ok',   text:'Tests: 12 passed | Coverage: 94.3% | Time: 1.2s' },
+    ],
+    stats: { time: '3.8s', lines: '+247', del: '0', tests: '12 passed' }
+  },
+  {
+    type: 'debug',
+    sequences: [
+      { t:0,   icon:'▶', cls:'type-cmd',  text:'claude code "fix async bug in fetchUserData.ts"' },
+      { t:400, icon:'ℹ', cls:'type-info', text:'コード解析中… AST走査 + 依存関係マッピング' },
+      { t:900, icon:'!', cls:'type-warn', text:'発見: Promise.all内でawait欠落 (line 47)' },
+      { t:1300,icon:'!', cls:'type-warn', text:'発見: エラー時のfallback処理なし (line 63)' },
+      { t:1700,icon:'✖', cls:'type-err',  text:'根本原因: 競合状態 → fetchUserとfetchOrderが並列未対応' },
+      { t:2200,icon:'⚙', cls:'type-code', text:'修正適用中: <code>fetchUserData.ts</code>' },
+      { t:2600,icon:'✔', cls:'type-ok',   text:'修正完了 — 8行変更, エラーハンドリング追加', diff: true },
+      { t:3000,icon:'▶', cls:'type-cmd',  text:'npm test -- fetchUserData.test.ts' },
+      { t:3400,icon:'✔', cls:'type-ok',   text:'Tests: 5 passed (previously 2 failing) | Time: 0.4s' },
+    ],
+    stats: { time: '2.9s', lines: '+8', del: '-3', tests: '5/5 passed' }
+  },
+  {
+    type: 'ref',
+    sequences: [
+      { t:0,   icon:'▶', cls:'type-cmd',  text:'claude code "refactor callback hell to async/await"' },
+      { t:400, icon:'ℹ', cls:'type-info', text:'コード解析中… コールバック深度: 最大6層検出' },
+      { t:900, icon:'ℹ', cls:'type-info', text:'変換プラン: Promise化 → async/await → エラー境界追加' },
+      { t:1400,icon:'⚙', cls:'type-code', text:'変換中: <code>src/utils/dataProcessor.ts</code> (6→2層)' },
+      { t:1800,icon:'⚙', cls:'type-code', text:'変換中: <code>src/services/apiService.ts</code> (4→2層)' },
+      { t:2200,icon:'⚙', cls:'type-code', text:'try-catch境界 / エラーオブジェクト追加' },
+      { t:2600,icon:'✔', cls:'type-ok',   text:'リファクタ完了 — 134行削減, 可読性スコア +42%', diff: true },
+      { t:3000,icon:'▶', cls:'type-cmd',  text:'npm test && npx tsc --noEmit' },
+      { t:3400,icon:'✔', cls:'type-ok',   text:'All tests pass | TypeScript: no errors | 🎉' },
+    ],
+    stats: { time: '2.5s', lines: '+28', del: '-134', tests: 'all pass' }
+  }
+];
+
+const diffs = [
+  [
+    { t:'add', c:'export const createUser = async (req, res) => {' },
+    { t:'add', c:'  const { error } = userSchema.validate(req.body);' },
+    { t:'add', c:'  if (error) return res.status(400).json({ error });' },
+    { t:'add', c:'  const user = await User.create(req.body);' },
+    { t:'add', c:'  res.status(201).json(user);' },
+    { t:'add', c:'};' },
+  ],
+  [
+    { t:'del', c:'  const user = await fetchUser(id);' },
+    { t:'del', c:'  const orders = fetchOrders(id); // missing await' },
+    { t:'add', c:'  const [user, orders] = await Promise.all([' },
+    { t:'add', c:'    fetchUser(id),' },
+    { t:'add', c:'    fetchOrders(id)' },
+    { t:'add', c:'  ]);' },
+  ],
+  [
+    { t:'del', c:'getData(function(d) { process(d, function(r) {' },
+    { t:'del', c:'  save(r, function(s) { console.log(s); }); }); });' },
+    { t:'add', c:'const data = await getData();' },
+    { t:'add', c:'const result = await process(data);' },
+    { t:'add', c:'await save(result);' },
+  ]
+];
+
+function selectTask(idx) {
+  if (running) return;
+  selectedTask = idx;
+  document.querySelectorAll('.task-card').forEach((c, i) => {
+    c.classList.toggle('selected', i === idx);
+  });
+}
+
+async function runDemo() {
+  if (running) return;
+  running = true;
+
+  const btn = document.querySelector('.run-btn');
+  btn.textContent = '⏳ 実行中…';
+  btn.style.background = 'linear-gradient(135deg, #1f3a1f, #1a2a1a)';
+
+  const area = document.getElementById('outputArea');
+  area.innerHTML = '';
+  document.getElementById('statTime').textContent = '—';
+  document.getElementById('statLines').textContent = '—';
+  document.getElementById('statDel').textContent = '—';
+  document.getElementById('statTests').textContent = '—';
+
+  const dot = document.getElementById('statusDot');
+  dot.style.background = '#f0883e';
+  dot.style.animation = 'blink 0.5s infinite';
+  document.getElementById('statusLabel').textContent = '実行中...';
+
+  const fill = document.getElementById('progressFill');
+  fill.style.width = '0%';
+
+  const task = tasks[selectedTask];
+  const total = task.sequences[task.sequences.length - 1].t + 600;
+
+  let startTime = Date.now();
+  let diffInserted = false;
+
+  for (let i = 0; i < task.sequences.length; i++) {
+    const seq = task.sequences[i];
+    await delay(i === 0 ? 0 : (task.sequences[i].t - task.sequences[i-1].t));
+
+    const line = document.createElement('div');
+    line.className = 'output-line';
+
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(95, (elapsed / total) * 100);
+    fill.style.width = progress + '%';
+
+    if (seq.diff && !diffInserted) {
+      diffInserted = true;
+      const block = buildDiff(diffs[selectedTask]);
+      line.appendChild(document.createElement('span')).className = 'line-type';
+      line.innerHTML = `<span class="line-type ${seq.cls}">${seq.icon}</span><span class="line-content">${seq.text}</span>`;
+      area.appendChild(line);
+      requestAnimationFrame(() => line.classList.add('visible'));
+      area.appendChild(block);
+      area.scrollTop = area.scrollHeight;
+      continue;
+    }
+
+    line.innerHTML = `<span class="line-type ${seq.cls}">${seq.icon}</span><span class="line-content">${seq.text}</span>`;
+    area.appendChild(line);
+    requestAnimationFrame(() => line.classList.add('visible'));
+    area.scrollTop = area.scrollHeight;
+  }
+
+  // cursor
+  const cursorLine = document.createElement('div');
+  cursorLine.className = 'output-line visible';
+  cursorLine.innerHTML = `<span class="line-type type-cmd">▶</span><span class="line-content"><span class="typing-cursor"></span></span>`;
+  area.appendChild(cursorLine);
+
+  fill.style.width = '100%';
+  dot.style.background = '#3fb950';
+  dot.style.animation = '';
+  document.getElementById('statusLabel').textContent = '完了';
+
+  document.getElementById('statTime').textContent = task.stats.time;
+  document.getElementById('statLines').textContent = task.stats.lines;
+  document.getElementById('statDel').textContent = task.stats.del;
+  document.getElementById('statTests').textContent = task.stats.tests;
+
+  btn.innerHTML = '✓ 完了 — 別のタスクを選んで再実行';
+  btn.style.background = 'linear-gradient(135deg, #0e3a6e, #1f6feb)';
+  running = false;
+}
+
+function buildDiff(lines) {
+  const block = document.createElement('div');
+  block.className = 'diff-block output-line visible';
+  block.innerHTML = `<div class="diff-header">📄 変更差分（抜粋）</div>`;
+  lines.forEach(l => {
+    const d = document.createElement('div');
+    d.className = `diff-line ${l.t === 'add' ? 'diff-add' : l.t === 'del' ? 'diff-del' : 'diff-ctx'}`;
+    d.textContent = (l.t === 'add' ? '+ ' : l.t === 'del' ? '- ' : '  ') + l.c;
+    block.appendChild(d);
+  });
+  return block;
+}
+
+function delay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+</script>
+</body>
+</html>
