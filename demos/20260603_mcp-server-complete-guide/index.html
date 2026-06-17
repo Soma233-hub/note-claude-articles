@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCPサーバー接続シミュレーター</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    width: 1200px;
+    height: 800px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #30363d;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e6edf3;
+  }
+  .badge {
+    font-size: 11px;
+    background: #388bfd22;
+    border: 1px solid #388bfd;
+    color: #79c0ff;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ─── 左パネル: サーバー選択 ─── */
+  .sidebar {
+    width: 240px;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sidebar h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b949e;
+    margin-bottom: 4px;
+  }
+
+  .server-card {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .server-card:hover { border-color: #388bfd; background: #1c2128; }
+  .server-card.active {
+    border-color: #3fb950;
+    background: #0d2b1c;
+  }
+  .server-card.active::before {
+    content: '●';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 8px;
+    color: #3fb950;
+  }
+
+  .server-icon { font-size: 22px; margin-bottom: 4px; }
+  .server-name { font-size: 13px; font-weight: 600; color: #e6edf3; }
+  .server-desc { font-size: 11px; color: #8b949e; margin-top: 2px; }
+  .tool-count {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 10px;
+    background: #388bfd22;
+    color: #79c0ff;
+    padding: 1px 6px;
+    border-radius: 8px;
+    border: 1px solid #388bfd55;
+  }
+
+  /* ─── 中央: アーキテクチャ図 ─── */
+  .center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 16px;
+  }
+
+  .arch-view {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    height: 180px;
+  }
+
+  .arch-block {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-align: center;
+    min-width: 130px;
+  }
+  .arch-block.claude-block {
+    border-color: #8b5cf6;
+    background: #1a1040;
+    min-width: 150px;
+  }
+  .arch-block.mcp-block { border-color: #388bfd; background: #0d1f38; }
+  .arch-block.tool-block { border-color: #3fb950; background: #0d2b1c; }
+  .arch-block.tool-block.inactive { border-color: #30363d; background: #21262d; opacity: 0.4; }
+
+  .arch-block-icon { font-size: 28px; }
+  .arch-block-name { font-size: 13px; font-weight: 700; color: #e6edf3; margin-top: 4px; }
+  .arch-block-sub { font-size: 10px; color: #8b949e; margin-top: 2px; }
+
+  .arch-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .arch-arrow-line {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, #388bfd, #3fb950);
+    border-radius: 1px;
+    position: relative;
+  }
+  .arch-arrow-line::after {
+    content: '▶';
+    position: absolute;
+    right: -8px;
+    top: -6px;
+    font-size: 10px;
+    color: #3fb950;
+  }
+  .arch-arrow-label { font-size: 9px; color: #8b949e; }
+
+  /* ─── ツール一覧 ─── */
+  .tools-section {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 14px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .tools-section h3 {
+    font-size: 12px;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .tool-item {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tool-item:hover { border-color: #388bfd; }
+  .tool-item.running { border-color: #d29922; background: #2b1f00; animation: pulse 1s infinite; }
+  .tool-item.done { border-color: #3fb950; background: #0d2b1c; }
+  .tool-fn { font-size: 11px; font-weight: 700; color: #79c0ff; font-family: monospace; }
+  .tool-desc { font-size: 10px; color: #8b949e; margin-top: 2px; }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+  /* ─── 右パネル: 実行ログ ─── */
+  .log-panel {
+    width: 280px;
+    background: #161b22;
+    border-left: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+  }
+  .log-panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #30363d;
+    font-size: 12px;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .log-clear {
+    font-size: 10px;
+    color: #58a6ff;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .log-clear:hover { color: #79c0ff; }
+
+  .log-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .log-body::-webkit-scrollbar { width: 4px; }
+  .log-body::-webkit-scrollbar-track { background: #161b22; }
+  .log-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+  .log-entry {
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border-left: 3px solid transparent;
+    background: #21262d;
+    line-height: 1.5;
+    animation: fadeIn 0.3s ease;
+  }
+  .log-entry.info { border-color: #388bfd; color: #79c0ff; }
+  .log-entry.success { border-color: #3fb950; color: #56d364; }
+  .log-entry.warning { border-color: #d29922; color: #e3b341; }
+  .log-entry.result { border-color: #a371f7; color: #d2a8ff; }
+
+  @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }
+
+  .empty-log {
+    text-align: center;
+    color: #484f58;
+    font-size: 12px;
+    margin-top: 40px;
+  }
+
+  footer {
+    background: #161b22;
+    border-top: 1px solid #30363d;
+    padding: 8px 20px;
+    font-size: 11px;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3fb950; margin-right: 5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="font-size:24px">🔌</div>
+  <div>
+    <h1>MCPサーバー接続シミュレーター</h1>
+  </div>
+  <div style="margin-left:auto; display:flex; gap:8px;">
+    <span class="badge">Model Context Protocol</span>
+    <span class="badge">上級編デモ</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- 左: サーバー選択 -->
+  <div class="sidebar">
+    <h2>MCPサーバー</h2>
+    <div class="server-card" id="card-slack" onclick="selectServer('slack')">
+      <div class="server-icon">💬</div>
+      <div class="server-name">Slack MCP</div>
+      <div class="server-desc">チャンネル・メッセージ操作</div>
+      <div class="tool-count">5 tools</div>
+    </div>
+    <div class="server-card" id="card-github" onclick="selectServer('github')">
+      <div class="server-icon">🐙</div>
+      <div class="server-name">GitHub MCP</div>
+      <div class="server-desc">リポジトリ・Issue管理</div>
+      <div class="tool-count">6 tools</div>
+    </div>
+    <div class="server-card" id="card-sqlite" onclick="selectServer('sqlite')">
+      <div class="server-icon">🗄️</div>
+      <div class="server-name">SQLite MCP</div>
+      <div class="server-desc">データベース読み書き</div>
+      <div class="tool-count">4 tools</div>
+    </div>
+    <div class="server-card" id="card-filesystem" onclick="selectServer('filesystem')">
+      <div class="server-icon">📁</div>
+      <div class="server-name">Filesystem MCP</div>
+      <div class="server-desc">ファイル読み書き・検索</div>
+      <div class="tool-count">5 tools</div>
+    </div>
+
+    <div style="margin-top:auto; font-size:10px; color:#484f58; line-height:1.5;">
+      サーバーをクリックして<br>接続 → ツールを実行
+    </div>
+  </div>
+
+  <!-- 中央 -->
+  <div class="center">
+    <div class="arch-view" id="arch-view">
+      <div class="arch-block claude-block">
+        <div class="arch-block-icon">🤖</div>
+        <div class="arch-block-name">Claude</div>
+        <div class="arch-block-sub">AI アシスタント</div>
+      </div>
+
+      <div class="arch-arrow">
+        <div class="arch-arrow-line"></div>
+        <div class="arch-arrow-label">JSON-RPC</div>
+      </div>
+
+      <div class="arch-block mcp-block" id="arch-mcp">
+        <div class="arch-block-icon" id="arch-mcp-icon">🔌</div>
+        <div class="arch-block-name" id="arch-mcp-name">MCPサーバー</div>
+        <div class="arch-block-sub" id="arch-mcp-sub">選択してください</div>
+      </div>
+
+      <div class="arch-arrow">
+        <div class="arch-arrow-line"></div>
+        <div class="arch-arrow-label">API / SDK</div>
+      </div>
+
+      <div class="arch-block tool-block inactive" id="arch-tool">
+        <div class="arch-block-icon" id="arch-tool-icon">❓</div>
+        <div class="arch-block-name" id="arch-tool-name">外部サービス</div>
+        <div class="arch-block-sub" id="arch-tool-sub">—</div>
+      </div>
+    </div>
+
+    <div class="tools-section">
+      <h3 id="tools-label">利用可能なツール</h3>
+      <div class="tools-grid" id="tools-grid">
+        <div style="grid-column:1/-1; text-align:center; color:#484f58; font-size:12px; padding:20px;">
+          左のサーバーをクリックして接続してください
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右: ログ -->
+  <div class="log-panel">
+    <div class="log-panel-header">
+      実行ログ
+      <a class="log-clear" onclick="clearLog()">クリア</a>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="empty-log">ツールを実行すると<br>ここにログが表示されます</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span><span class="status-dot"></span>MCP Protocol v1.0</span>
+  <span>JSON-RPC 2.0 over stdio / HTTP+SSE</span>
+  <span style="margin-left:auto;">クリックしてツールを試す →</span>
+</footer>
+
+<script>
+const SERVERS = {
+  slack: {
+    icon: '💬', name: 'Slack MCP', sub: 'slack.com API',
+    toolIcon: '💬', toolName: 'Slack', toolSub: 'メッセージ・チャンネル',
+    tools: [
+      { fn: 'send_message',     desc: 'チャンネルにメッセージ送信', result: '✅ #general に投稿完了（ts: 1748950000.000)' },
+      { fn: 'list_channels',    desc: 'チャンネル一覧を取得',        result: '📋 #general, #dev, #random ... 12チャンネル' },
+      { fn: 'search_messages',  desc: 'メッセージ全文検索',           result: '🔍 "Claude" で3件ヒット' },
+      { fn: 'get_thread',       desc: 'スレッド取得',                 result: '💬 スレッド5件取得完了' },
+      { fn: 'create_canvas',    desc: 'Canvasドキュメント作成',       result: '📄 Canvas "MCP手順書" 作成完了' },
+    ]
+  },
+  github: {
+    icon: '🐙', name: 'GitHub MCP', sub: 'api.github.com',
+    toolIcon: '🐙', toolName: 'GitHub', toolSub: 'リポジトリ・Issues',
+    tools: [
+      { fn: 'list_issues',        desc: 'Issue一覧取得',               result: '📋 Open 12件、Closed 48件' },
+      { fn: 'create_issue',       desc: '新規Issue作成',               result: '✅ Issue #61 "MCPバグ修正" 作成' },
+      { fn: 'get_file_contents',  desc: 'ファイル内容取得',            result: '📄 README.md (3.2KB) 取得完了' },
+      { fn: 'push_files',         desc: 'ファイルをpush',              result: '🚀 main ブランチにpush完了' },
+      { fn: 'search_code',        desc: 'コード検索',                  result: '🔍 "mcp_server" で5ファイルヒット' },
+      { fn: 'create_pull_request',desc: 'PRを作成',                    result: '✅ PR #22 "feat: MCP対応" 作成' },
+    ]
+  },
+  sqlite: {
+    icon: '🗄️', name: 'SQLite MCP', sub: 'ローカルDB',
+    toolIcon: '🗄️', toolName: 'SQLite', toolSub: 'database.db',
+    tools: [
+      { fn: 'execute_query',    desc: 'SQLクエリ実行',     result: '📊 SELECT結果: 152行取得' },
+      { fn: 'list_tables',      desc: 'テーブル一覧',      result: '📋 users, articles, tags (3テーブル)' },
+      { fn: 'describe_table',   desc: 'テーブル定義取得',  result: '📐 users: id, name, email, created_at' },
+      { fn: 'insert_row',       desc: '行を挿入',          result: '✅ id=153 に挿入完了' },
+    ]
+  },
+  filesystem: {
+    icon: '📁', name: 'Filesystem MCP', sub: '~/projects/',
+    toolIcon: '📁', toolName: 'ファイルシステム', toolSub: 'ローカルディレクトリ',
+    tools: [
+      { fn: 'read_file',        desc: 'ファイル読み込み',  result: '📄 config.json (842B) 読込完了' },
+      { fn: 'write_file',       desc: 'ファイル書き込み',  result: '✅ output.md を書き込み完了' },
+      { fn: 'list_directory',   desc: 'ディレクトリ一覧',  result: '📋 15ファイル / 3ディレクトリ' },
+      { fn: 'search_files',     desc: 'ファイル検索',      result: '🔍 *.md で8ファイルヒット' },
+      { fn: 'get_file_info',    desc: 'ファイル情報取得',  result: '📊 サイズ: 4.2KB, 更新: 2分前' },
+    ]
+  }
+};
+
+let activeServer = null;
+let logEntries = [];
+
+function selectServer(key) {
+  activeServer = key;
+  const s = SERVERS[key];
+
+  // サイドバーのアクティブ切り替え
+  document.querySelectorAll('.server-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('card-' + key).classList.add('active');
+
+  // アーキテクチャ図更新
+  document.getElementById('arch-mcp-icon').textContent = s.icon;
+  document.getElementById('arch-mcp-name').textContent = s.name;
+  document.getElementById('arch-mcp-sub').textContent = s.sub;
+  document.getElementById('arch-tool-icon').textContent = s.toolIcon;
+  document.getElementById('arch-tool-name').textContent = s.toolName;
+  document.getElementById('arch-tool-sub').textContent = s.toolSub;
+  document.getElementById('arch-tool').classList.remove('inactive');
+
+  // ツールグリッド更新
+  document.getElementById('tools-label').textContent = s.name + ' — 利用可能ツール';
+  const grid = document.getElementById('tools-grid');
+  grid.innerHTML = '';
+  s.tools.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'tool-item';
+    div.id = 'tool-' + i;
+    div.innerHTML = `<div class="tool-fn">${t.fn}()</div><div class="tool-desc">${t.desc}</div>`;
+    div.onclick = () => executeTool(key, i);
+    grid.appendChild(div);
+  });
+
+  addLog('info', `🔌 ${s.name} に接続完了`);
+  addLog('info', `📋 ${s.tools.length} ツールを取得`);
+}
+
+function executeTool(serverKey, toolIdx) {
+  const s = SERVERS[serverKey];
+  const t = s.tools[toolIdx];
+  const el = document.getElementById('tool-' + toolIdx);
+
+  el.classList.add('running');
+  addLog('warning', `⚙️  ${t.fn}() を実行中...`);
+
+  setTimeout(() => {
+    el.classList.remove('running');
+    el.classList.add('done');
+    addLog('success', `✅ ${t.fn}() 完了`);
+    addLog('result', `   ${t.result}`);
+  }, 600 + Math.random() * 400);
+}
+
+function addLog(type, text) {
+  const body = document.getElementById('log-body');
+  const empty = body.querySelector('.empty-log');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = 'log-entry ' + type;
+  const now = new Date();
+  const ts = now.getHours().toString().padStart(2,'0') + ':' +
+             now.getMinutes().toString().padStart(2,'0') + ':' +
+             now.getSeconds().toString().padStart(2,'0');
+  div.textContent = `[${ts}] ${text}`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearLog() {
+  const body = document.getElementById('log-body');
+  body.innerHTML = '<div class="empty-log">ツールを実行すると<br>ここにログが表示されます</div>';
+}
+</script>
+</body>
+</html>
