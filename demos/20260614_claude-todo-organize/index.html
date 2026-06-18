@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude ToDo整理アシスタント</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .container {
+    width: 1160px;
+    max-width: 100%;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    overflow: hidden;
+    display: flex;
+    height: 760px;
+  }
+  .left-panel {
+    width: 420px;
+    background: #f8f9ff;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e8eaf6;
+  }
+  .right-panel {
+    flex: 1;
+    padding: 32px;
+    overflow-y: auto;
+    background: #fff;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+  }
+  .logo h1 {
+    font-size: 18px;
+    color: #333;
+    font-weight: 700;
+  }
+  .logo p {
+    font-size: 12px;
+    color: #888;
+  }
+  label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+    display: block;
+  }
+  textarea {
+    width: 100%;
+    height: 180px;
+    padding: 14px;
+    border: 2px solid #e0e3f0;
+    border-radius: 12px;
+    font-size: 13px;
+    resize: none;
+    line-height: 1.6;
+    color: #333;
+    background: #fff;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+  .prompt-selector {
+    margin: 16px 0;
+  }
+  .prompt-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 2px solid #e0e3f0;
+    background: #fff;
+    font-size: 12px;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .chip:hover { border-color: #667eea; color: #667eea; }
+  .chip.active { background: #667eea; border-color: #667eea; color: #fff; }
+  .btn {
+    margin-top: 20px;
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    font-family: inherit;
+  }
+  .btn:hover { opacity: 0.92; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .sample-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .sample-btn:hover { background: #f0f0ff; }
+
+  .right-panel h2 {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 6px;
+  }
+  .right-panel .subtitle {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 24px;
+  }
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 500px;
+    color: #bbb;
+  }
+  .empty-state .icon { font-size: 64px; margin-bottom: 16px; }
+  .empty-state p { font-size: 14px; text-align: center; line-height: 1.8; }
+  .loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 500px;
+  }
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e0e3f0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { color: #888; font-size: 14px; }
+
+  .result-area { display: none; }
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    margin-top: 24px;
+  }
+  .category-header:first-child { margin-top: 0; }
+  .category-badge {
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .badge-urgent { background: #f44336; }
+  .badge-important { background: #ff9800; }
+  .badge-delegate { background: #2196f3; }
+  .badge-later { background: #9e9e9e; }
+  .category-count {
+    font-size: 13px;
+    color: #888;
+  }
+  .task-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .task-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid #eee;
+    background: #fafafa;
+    animation: fadeIn 0.3s ease forwards;
+    opacity: 0;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .task-card.urgent { border-left: 4px solid #f44336; background: #fff5f5; }
+  .task-card.important { border-left: 4px solid #ff9800; background: #fff8f0; }
+  .task-card.delegate { border-left: 4px solid #2196f3; background: #f0f6ff; }
+  .task-card.later { border-left: 4px solid #9e9e9e; background: #f7f7f7; }
+  .task-icon { font-size: 18px; margin-top: 1px; flex-shrink: 0; }
+  .task-text { flex: 1; font-size: 14px; color: #333; line-height: 1.5; }
+  .task-reason { font-size: 12px; color: #888; margin-top: 4px; }
+  .checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 2px solid #ddd;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    margin-top: 1px;
+  }
+  .checkbox:hover { border-color: #667eea; }
+  .checkbox.checked { background: #667eea; border-color: #667eea; color: #fff; font-size: 12px; }
+  .summary-box {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #667eea11, #764ba211);
+    border-radius: 12px;
+    border: 1px solid #667eea44;
+  }
+  .summary-box h3 { font-size: 14px; color: #667eea; margin-bottom: 10px; }
+  .summary-box p { font-size: 13px; color: #555; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="left-panel">
+    <div class="logo">
+      <div class="logo-icon">✓</div>
+      <div>
+        <h1>Claude ToDo整理</h1>
+        <p>AIがタスクを最適分類</p>
+      </div>
+    </div>
+
+    <label>📋 今日のToDoリストを貼り付け</label>
+    <textarea id="todoInput" placeholder="例：
+・企画書を作成する
+・Aさんにメールを返信
+・来月の予算を確認
+・ランチの予約を入れる
+・週次報告書を提出（明日締切）
+・部屋の掃除
+・プレゼン資料のレビュー依頼"></textarea>
+
+    <div class="prompt-selector">
+      <label>🎯 整理スタイルを選択</label>
+      <div class="prompt-chips">
+        <button class="chip active" onclick="selectChip(this, 'matrix')">緊急×重要マトリクス</button>
+        <button class="chip" onclick="selectChip(this, 'time')">所要時間で分類</button>
+        <button class="chip" onclick="selectChip(this, 'energy')">エネルギー量で分類</button>
+      </div>
+    </div>
+
+    <button class="btn" id="organizeBtn" onclick="organize()">✨ Claudeで整理する</button>
+    <button class="sample-btn" onclick="fillSample()">サンプルデータを入力</button>
+  </div>
+
+  <div class="right-panel">
+    <h2>整理結果</h2>
+    <p class="subtitle">Claudeがタスクを優先度・重要度で自動分類します</p>
+
+    <div class="empty-state" id="emptyState">
+      <div class="icon">📝</div>
+      <p>左側にToDoリストを入力して<br>「Claudeで整理する」を押してください<br><br>AIが緊急度と重要度を分析して<br>最適な優先順位を提案します</p>
+    </div>
+
+    <div class="loading" id="loadingState">
+      <div class="spinner"></div>
+      <p>Claudeがタスクを分析中...</p>
+    </div>
+
+    <div class="result-area" id="resultArea"></div>
+  </div>
+</div>
+
+<script>
+let selectedStyle = 'matrix';
+
+function selectChip(el, style) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selectedStyle = style;
+}
+
+function fillSample() {
+  document.getElementById('todoInput').value = `・企画書（来週月曜プレゼン）の骨子を作成
+・Bさんへのメール返信（昨日から保留中）
+・四半期レポートのデータ集計
+・チームランチの店を予約（今日中）
+・新機能の仕様レビュー（明日締切）
+・デスクの整理整頓
+・競合サービスのリサーチ
+・経費精算（今月末締切）
+・部下Cさんのタスク進捗確認
+・読みたかった本を注文`;
+}
+
+const sampleResults = {
+  matrix: [
+    {
+      category: '🔴 緊急 × 重要（今日中にやること）',
+      badge: 'urgent',
+      tasks: [
+        { icon: '🔥', text: 'Bさんへのメール返信（昨日から保留中）', reason: '相手を待たせており信頼に関わる。5分以内に着手' },
+        { icon: '🔥', text: 'チームランチの店を予約（今日中）', reason: '今日中の締切あり。今すぐ実行すれば2分で完了' },
+        { icon: '🔥', text: '新機能の仕様レビュー（明日締切）', reason: '明日締切のため今日中に完了必須' },
+      ]
+    },
+    {
+      category: '🟠 重要 × 余裕あり（今週中のこと）',
+      badge: 'important',
+      tasks: [
+        { icon: '📌', text: '企画書（来週月曜プレゼン）の骨子を作成', reason: '期限まで数日あるが、早めに着手するほど質が上がる' },
+        { icon: '📌', text: '四半期レポートのデータ集計', reason: '今月末締切。スケジュールに時間ブロックを確保しよう' },
+        { icon: '📌', text: '部下Cさんのタスク進捗確認', reason: 'マネジメント責務。週1回は実施すべき重要タスク' },
+      ]
+    },
+    {
+      category: '🔵 急ぐが重要度低（誰かに頼む or 後回し）',
+      badge: 'delegate',
+      tasks: [
+        { icon: '🤝', text: '経費精算（今月末締切）', reason: '今月末まで余裕あり。曜日を決めてルーティン化推奨' },
+        { icon: '🤝', text: '競合サービスのリサーチ', reason: '急ぎではない。インターン等に依頼できないか検討を' },
+      ]
+    },
+    {
+      category: '⚪ 急がない × 重要度低（削除 or 来週以降）',
+      badge: 'later',
+      tasks: [
+        { icon: '📦', text: 'デスクの整理整頓', reason: '業務への影響は限定的。週末や隙間時間に回してOK' },
+        { icon: '📦', text: '読みたかった本を注文', reason: '今日でなくても全く問題なし。週末にまとめて実施を' },
+      ]
+    }
+  ]
+};
+
+function organize() {
+  const input = document.getElementById('todoInput').value.trim();
+  if (!input) {
+    document.getElementById('todoInput').style.borderColor = '#f44336';
+    setTimeout(() => document.getElementById('todoInput').style.borderColor = '#e0e3f0', 1500);
+    return;
+  }
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('organizeBtn').disabled = true;
+
+  setTimeout(() => {
+    document.getElementById('loadingState').style.display = 'none';
+    showResults();
+    document.getElementById('organizeBtn').disabled = false;
+  }, 1800);
+}
+
+function showResults() {
+  const area = document.getElementById('resultArea');
+  area.style.display = 'block';
+  area.innerHTML = '';
+
+  const data = sampleResults['matrix'];
+  let delay = 0;
+
+  data.forEach(group => {
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    header.innerHTML = `
+      <span class="category-badge badge-${group.badge}">${group.tasks.length}件</span>
+      <span style="font-size:14px;font-weight:600;color:#333;">${group.category}</span>
+    `;
+    area.appendChild(header);
+
+    const cards = document.createElement('div');
+    cards.className = 'task-cards';
+
+    group.tasks.forEach((task, i) => {
+      const card = document.createElement('div');
+      card.className = `task-card ${group.badge}`;
+      card.style.animationDelay = `${delay * 80}ms`;
+      card.innerHTML = `
+        <div class="checkbox" onclick="toggleCheck(this)"></div>
+        <span class="task-icon">${task.icon}</span>
+        <div>
+          <div class="task-text">${task.text}</div>
+          <div class="task-reason">💡 ${task.reason}</div>
+        </div>
+      `;
+      cards.appendChild(card);
+      delay++;
+    });
+
+    area.appendChild(cards);
+  });
+
+  const summary = document.createElement('div');
+  summary.className = 'summary-box';
+  summary.innerHTML = `
+    <h3>🤖 Claudeからのアドバイス</h3>
+    <p>今日は<strong>3件</strong>を優先処理しましょう。まず「Bさんへの返信」を5分で済ませることで、午前中の集中力を「新機能レビュー」に注ぎ込めます。企画書はランチ後の1時間ブロックを使うと効果的です。</p>
+  `;
+  area.appendChild(summary);
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  if (el.classList.contains('checked')) {
+    el.innerHTML = '✓';
+    el.closest('.task-card').style.opacity = '0.5';
+    el.closest('.task-card').style.textDecoration = 'line-through';
+  } else {
+    el.innerHTML = '';
+    el.closest('.task-card').style.opacity = '1';
+    el.closest('.task-card').style.textDecoration = 'none';
+  }
+}
+</script>
+</body>
+</html>
