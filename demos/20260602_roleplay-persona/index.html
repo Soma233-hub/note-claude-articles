@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudeロールプレイ体験デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    min-height: 100vh;
+    color: #fff;
+    padding: 24px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: #94a3b8;
+    font-size: 14px;
+  }
+  .personas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .persona-card {
+    background: rgba(255,255,255,0.05);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+  }
+  .persona-card:hover {
+    background: rgba(255,255,255,0.1);
+    transform: translateY(-4px);
+  }
+  .persona-card.active {
+    border-color: var(--color);
+    background: rgba(255,255,255,0.12);
+    box-shadow: 0 0 20px rgba(167,139,250,0.3);
+  }
+  .persona-icon {
+    font-size: 42px;
+    margin-bottom: 10px;
+  }
+  .persona-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .persona-desc {
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+  .persona-card[data-id="expert"] { --color: #a78bfa; }
+  .persona-card[data-id="expert"] .persona-name { color: #a78bfa; }
+  .persona-card[data-id="critic"] { --color: #f97316; }
+  .persona-card[data-id="critic"] .persona-name { color: #f97316; }
+  .persona-card[data-id="mentor"] { --color: #34d399; }
+  .persona-card[data-id="mentor"] .persona-name { color: #34d399; }
+
+  .content-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .panel {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.05em;
+  }
+  .panel-body {
+    padding: 16px 18px;
+  }
+  .prompt-box {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #e2e8f0;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    min-height: 160px;
+  }
+  .copy-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .copy-btn:hover { opacity: 0.85; transform: scale(1.02); }
+  .copy-btn.copied { background: #34d399 !important; color: #000; }
+
+  .chat-area {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 200px;
+  }
+  .chat-bubble {
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.65;
+    max-width: 90%;
+  }
+  .chat-user {
+    background: rgba(99,102,241,0.25);
+    border: 1px solid rgba(99,102,241,0.3);
+    align-self: flex-end;
+    color: #c7d2fe;
+  }
+  .chat-claude {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    align-self: flex-start;
+    color: #e2e8f0;
+  }
+  .chat-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+    opacity: 0.6;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .tip-box {
+    grid-column: 1 / -1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .tip-icon { font-size: 22px; flex-shrink: 0; }
+  .tips-list { font-size: 13px; color: #94a3b8; line-height: 1.8; }
+  .tips-list strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎭 Claudeロールプレイ体験デモ</h1>
+  <p>ペルソナを選んで、プロンプトテンプレートとサンプル会話を確認しよう</p>
+</div>
+
+<div class="personas">
+  <div class="persona-card active" data-id="expert" onclick="selectPersona('expert')">
+    <div class="persona-icon">🔬</div>
+    <div class="persona-name">専門家</div>
+    <div class="persona-desc">特定分野の深い知識を持つ専門家として、正確・詳細な回答を引き出す</div>
+  </div>
+  <div class="persona-card" data-id="critic" onclick="selectPersona('critic')">
+    <div class="persona-icon">🧐</div>
+    <div class="persona-name">批評家</div>
+    <div class="persona-desc">あなたのアイデアや文章の弱点を鋭く指摘。改善点を漏れなく抽出する</div>
+  </div>
+  <div class="persona-card" data-id="mentor" onclick="selectPersona('mentor')">
+    <div class="persona-icon">🌱</div>
+    <div class="persona-name">メンター</div>
+    <div class="persona-desc">ソクラテス式問答で自己洞察を深める。答えを教えず、気づきへ導く</div>
+  </div>
+</div>
+
+<div class="content-area">
+  <div class="panel">
+    <div class="panel-header">
+      📋 コピペ用プロンプトテンプレート
+      <span id="badge" class="badge" style="background:rgba(167,139,250,0.2);color:#a78bfa;">専門家</span>
+    </div>
+    <div class="panel-body">
+      <div class="prompt-box" id="promptText"></div>
+      <button class="copy-btn" id="copyBtn" onclick="copyPrompt()" style="background:#a78bfa;color:#000;">
+        📋 プロンプトをコピー
+      </button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">💬 サンプル会話（例）</div>
+    <div class="panel-body">
+      <div class="chat-area" id="chatArea"></div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <div class="tip-icon">💡</div>
+    <div class="tips-list" id="tipsText"></div>
+  </div>
+</div>
+
+<script>
+const personas = {
+  expert: {
+    color: '#a78bfa',
+    badge: '専門家',
+    prompt: `あなたは[分野]の第一線で活躍する専門家です。
+学術論文や最新の業界動向に精通しており、
+専門用語を適切に使いながらも、相手の理解レベルに
+合わせて分かりやすく説明することが得意です。
+
+以下のルールに従ってください：
+- 必ず根拠・エビデンスを示す
+- 「〜と言われています」ではなく断言する
+- 反対意見や限界についても公正に述べる
+- 実践で使える具体的なアドバイスを添える
+
+それでは始めましょう。[質問を入力]`,
+    chat: [
+      { role: 'user', text: 'マーケティング専門家として聞きます。SNSでバズるコンテンツの共通点は？' },
+      { role: 'claude', text: '専門家の立場からお答えします。バズるコンテンツには3つの構造的特徴があります。\n\n①「自己関連性」— 読者が「自分のことだ」と感じる冒頭フック。HBRの研究では冒頭3秒で70%のエンゲージメントが決まります。\n\n②「感情的覚醒度の高さ」— 驚き・怒り・感動いずれかが強い投稿はシェア率が2.3倍（MIT, 2023）。中立な感情では拡散しません。\n\n③「即時実践可能性」— 読んだその日に試せるtipsは保存率が4倍高い。抽象論より具体的な「◯◯する」形式を使ってください。' }
+    ],
+    tips: `<strong>専門家ペルソナを活かすコツ</strong><br>
+• <strong>分野を具体的に</strong>指定する（「マーケティング専門家」→「BtoB SaaSのマーケター歴15年」）<br>
+• 「根拠を示して」「データを使って」など<strong>出力形式を制約</strong>するとより高品質な回答に<br>
+• 「反論も含めて」と加えると<strong>批判的思考</strong>が促進され、偏りのない回答が得られる`
+  },
+  critic: {
+    color: '#f97316',
+    badge: '批評家',
+    prompt: `あなたは厳格なプロの批評家です。
+私が提示するアイデア・文章・計画に対して、
+遠慮なく問題点・矛盾・改善点を指摘してください。
+
+批評のルール：
+- 良い点を先に述べた後、問題点を列挙する
+- 「なぜそれが問題か」を必ず説明する
+- 改善案を具体的に提示する
+- 感情論ではなく論理・データ・事例で批評する
+
+評価対象：
+[ここに批評してほしい内容を貼り付ける]`,
+    chat: [
+      { role: 'user', text: '以下のビジネスプランを批評してください：「AIで会議の議事録を自動作成するSaaSを月額5,000円で提供する」' },
+      { role: 'claude', text: '【良い点】\n音声認識＋要約のニーズは実在し、市場規模も拡大中。価格帯は企業向けに現実的です。\n\n【問題点・懸念事項】\n❶ 競合過多: Otter.ai、Notta、Googleなど既存ツールが飽和。差別化軸が見えません。\n\n❷ 粗利率の懸念: AI API費用＋ホスティング＋サポートを引くと月額5,000円で黒字化できるか試算が必要です。\n\n❸ 「自動」の品質問題: 専門用語・方言・騒音環境での精度低下。クレーム対応コストを過小評価している可能性があります。\n\n【改善提案】\n特定業界（医療、法律、不動産）に特化して差別化し、業界固有辞書を武器にすることを強くお勧めします。' }
+    ],
+    tips: `<strong>批評家ペルソナを活かすコツ</strong><br>
+• 批評対象をそのまま貼り付けるだけでOK。<strong>構造化された批評</strong>が自動的に返ってくる<br>
+• 「5点満点で採点して」と加えると<strong>定量評価</strong>も得られる<br>
+• 「最も致命的な問題点だけ3つに絞って」と制約すると<strong>優先順位付き</strong>のフィードバックに`
+  },
+  mentor: {
+    color: '#34d399',
+    badge: 'メンター',
+    prompt: `あなたはソクラテス式対話を実践する経験豊富なメンターです。
+私が答えに到達できるよう、直接答えを教えるのではなく、
+適切な質問を投げかけて自己洞察を促してください。
+
+メンタリングの原則：
+- 1度に質問は1つだけ
+- 答えを急かさず、考える時間を尊重する
+- 気づきが生まれた瞬間を言語化するのを助ける
+- 必要な時だけ、ヒントを段階的に提供する
+
+テーマ：[相談したいテーマを入力]`,
+    chat: [
+      { role: 'user', text: '副業を始めたいのですが、何から手をつければいいか分かりません。' },
+      { role: 'claude', text: 'それは大切な一歩ですね。まず一つ聞かせてください。\n\n「副業を始めたい」という気持ちの背景に、あなたが本当に手に入れたいものは何でしょうか？\n\n収入を増やすこと、新しいスキルを身につけること、それとも別の何かでしょうか？\n\n焦らず、思ったことを言葉にしてみてください。' },
+      { role: 'user', text: '収入も大事ですが、やりがいも感じたくて…' },
+      { role: 'claude', text: 'なるほど、収入とやりがいの両方を大切にしているんですね。\n\n少し掘り下げてみましょう。今の本業で「やりがい」を感じている瞬間はありますか？あるとすれば、それはどんな時でしょう？' }
+    ],
+    tips: `<strong>メンターペルソナを活かすコツ</strong><br>
+• 相談は<strong>抽象的なまま</strong>でOK。メンターが具体化を手伝ってくれる<br>
+• 「〜について相談したい」とシンプルに伝えるだけで<strong>深い対話</strong>が始まる<br>
+• 「今日は答えが欲しいのではなく、考えを整理したい」と伝えると<strong>より対話重視</strong>のモードになる`
+  }
+};
+
+let currentPersona = 'expert';
+
+function selectPersona(id) {
+  document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('active'));
+  document.querySelector(`[data-id="${id}"]`).classList.add('active');
+  currentPersona = id;
+  const p = personas[id];
+
+  document.getElementById('promptText').textContent = p.prompt;
+  document.getElementById('badge').textContent = p.badge;
+  document.getElementById('badge').style.background = p.color + '33';
+  document.getElementById('badge').style.color = p.color;
+  document.getElementById('copyBtn').style.background = p.color;
+
+  const chatArea = document.getElementById('chatArea');
+  chatArea.innerHTML = '';
+  p.chat.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = `chat-bubble chat-${msg.role}`;
+    const label = msg.role === 'user' ? 'あなた' : `Claude（${p.badge}）`;
+    div.innerHTML = `<div class="chat-label">${label}</div>${msg.text.replace(/\n/g, '<br>')}`;
+    chatArea.appendChild(div);
+  });
+
+  document.getElementById('tipsText').innerHTML = p.tips;
+  document.getElementById('copyBtn').classList.remove('copied');
+  document.getElementById('copyBtn').textContent = '📋 プロンプトをコピー';
+}
+
+function copyPrompt() {
+  const p = personas[currentPersona];
+  navigator.clipboard.writeText(p.prompt).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ コピーしました！';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.style.background = p.color;
+      btn.textContent = '📋 プロンプトをコピー';
+    }, 2000);
+  });
+}
+
+selectPersona('expert');
+</script>
+</body>
+</html>
