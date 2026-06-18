@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude To-Do優先順位プロンプト デモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 0.875rem;
+    color: #8b949e;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 1140px;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+  }
+  /* Left panel */
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .task-input {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .task-input input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #e6edf3;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .task-input input:focus { border-color: #58a6ff; }
+  .task-input input::placeholder { color: #484f58; }
+  .btn {
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #2ea043; }
+  .btn-blue { background: #1f6feb; }
+  .btn-blue:hover { background: #388bfd; }
+  .task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .task-item {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: grab;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .task-item:hover { border-color: #58a6ff; background: #1a2030; }
+  .task-item.dragging { opacity: 0.4; }
+  .task-num {
+    font-size: 0.7rem;
+    color: #58a6ff;
+    font-weight: 700;
+    min-width: 18px;
+  }
+  .task-text { flex: 1; line-height: 1.3; }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: #484f58;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .remove-btn:hover { color: #f85149; }
+  /* Prompt selector */
+  .prompt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .prompt-item {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .prompt-item:hover { border-color: #58a6ff; background: #1a2030; }
+  .prompt-item.active { border-color: #388bfd; background: #0e1f3d; }
+  .prompt-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #79c0ff;
+    margin-bottom: 2px;
+  }
+  .prompt-desc {
+    font-size: 0.72rem;
+    color: #8b949e;
+    line-height: 1.4;
+  }
+  /* Right panel */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .matrix {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 12px;
+    height: 400px;
+  }
+  .quadrant {
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    transition: border-color 0.2s;
+  }
+  .quadrant.drag-over { border-width: 2px !important; }
+  .q1 { background: #1a0d0d; border: 1px solid #f85149; }
+  .q2 { background: #0d1a11; border: 1px solid #3fb950; }
+  .q3 { background: #1a1400; border: 1px solid #d29922; }
+  .q4 { background: #12121a; border: 1px solid #6e7681; }
+  .quadrant-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .q-icon { font-size: 1.1rem; }
+  .q-title { font-size: 0.82rem; font-weight: 700; }
+  .q-sub { font-size: 0.7rem; color: #8b949e; margin-top: 1px; }
+  .q1 .q-title { color: #f85149; }
+  .q2 .q-title { color: #3fb950; }
+  .q3 .q-title { color: #d29922; }
+  .q4 .q-title { color: #8b949e; }
+  .quadrant-tasks {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .q-task {
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: #e6edf3;
+    cursor: grab;
+    transition: background 0.1s;
+  }
+  .q-task:hover { background: rgba(255,255,255,0.1); }
+  .drop-hint {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #30363d;
+    font-size: 0.75rem;
+    border: 1px dashed #21262d;
+    border-radius: 8px;
+    margin-top: 4px;
+  }
+  /* Prompt display */
+  .prompt-display {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .prompt-display h3 {
+    font-size: 0.8rem;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .prompt-box {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+    position: relative;
+  }
+  .copy-btn {
+    margin-top: 8px;
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: #30363d; color: #e6edf3; }
+  .copy-btn.copied { background: #0f3b2a; border-color: #3fb950; color: #3fb950; }
+  /* Axis labels */
+  .matrix-wrapper {
+    position: relative;
+  }
+  .axis-label {
+    font-size: 0.7rem;
+    color: #6e7681;
+    text-align: center;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+  }
+  .y-axis {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    font-size: 0.65rem;
+    color: #6e7681;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+</style>
+</head>
+<body>
+
+<h1>🗂️ Claude To-Do 優先順位マトリクス</h1>
+<p class="subtitle">タスクをドラッグ&ドロップで整理 → プロンプトをコピーしてClaudeに貼り付けよう</p>
+
+<div class="container">
+  <!-- Left: task input + prompt selector -->
+  <div class="left-panel">
+    <div class="panel">
+      <h2>📋 タスク一覧</h2>
+      <div class="task-input">
+        <input type="text" id="taskInput" placeholder="新しいタスクを入力..." maxlength="40">
+        <button class="btn" onclick="addTask()">追加</button>
+      </div>
+      <div class="task-list" id="taskList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>⚡ プロンプト5選</h2>
+      <div class="prompt-list" id="promptList"></div>
+    </div>
+  </div>
+
+  <!-- Right: matrix + prompt display -->
+  <div class="right-panel">
+    <div class="panel" style="padding: 16px;">
+      <div class="axis-label">
+        <span>⬅️ 重要でない</span>
+        <span>重要 ➡️</span>
+      </div>
+      <div class="matrix" id="matrix">
+        <div class="quadrant q2" data-q="q2" ondragover="onDragOver(event)" ondrop="onDrop(event,'q2')" ondragleave="onDragLeave(event)">
+          <div class="quadrant-header">
+            <span class="q-icon">🟢</span>
+            <div>
+              <div class="q-title">重要・緊急でない</div>
+              <div class="q-sub">計画・スケジュール</div>
+            </div>
+          </div>
+          <div class="quadrant-tasks" id="q2-tasks"></div>
+        </div>
+        <div class="quadrant q1" data-q="q1" ondragover="onDragOver(event)" ondrop="onDrop(event,'q1')" ondragleave="onDragLeave(event)">
+          <div class="quadrant-header">
+            <span class="q-icon">🔴</span>
+            <div>
+              <div class="q-title">重要・緊急</div>
+              <div class="q-sub">今すぐ対応！</div>
+            </div>
+          </div>
+          <div class="quadrant-tasks" id="q1-tasks"></div>
+        </div>
+        <div class="quadrant q4" data-q="q4" ondragover="onDragOver(event)" ondrop="onDrop(event,'q4')" ondragleave="onDragLeave(event)">
+          <div class="quadrant-header">
+            <span class="q-icon">⚫</span>
+            <div>
+              <div class="q-title">重要でない・緊急でない</div>
+              <div class="q-sub">後回し or 削除</div>
+            </div>
+          </div>
+          <div class="quadrant-tasks" id="q4-tasks"></div>
+        </div>
+        <div class="quadrant q3" data-q="q3" ondragover="onDragOver(event)" ondrop="onDrop(event,'q3')" ondragleave="onDragLeave(event)">
+          <div class="quadrant-header">
+            <span class="q-icon">🟡</span>
+            <div>
+              <div class="q-title">重要でない・緊急</div>
+              <div class="q-sub">委任・効率化</div>
+            </div>
+          </div>
+          <div class="quadrant-tasks" id="q3-tasks"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prompt-display">
+      <h3>📝 コピー用プロンプト</h3>
+      <div class="prompt-box" id="promptBox">← 左のプロンプトを選択してください</div>
+      <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">📋 クリップボードにコピー</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROMPTS = [
+  {
+    id: 'p1',
+    title: 'プロンプト①：アイゼンハワーマトリクス',
+    desc: '重要度×緊急度で4分類',
+    template: `以下のTo-Doリストを「アイゼンハワーマトリクス」で分類してください。
+
+【タスク一覧】
+{TASKS}
+
+出力形式：
+🔴 重要×緊急（今すぐ対応）：
+🟢 重要×緊急でない（計画して対応）：
+🟡 重要でない×緊急（委任・効率化）：
+⚫ 重要でない×緊急でない（後回し・削除）：
+
+各タスクに分類した理由を1行で添えてください。`
+  },
+  {
+    id: 'p2',
+    title: 'プロンプト②：時間見積もり付き順位付け',
+    desc: '所要時間を考慮して並び替え',
+    template: `以下のTo-Doを優先順位順に並べ替え、各タスクの所要時間も推定してください。
+
+【タスク一覧】
+{TASKS}
+
+出力形式（表形式）：
+| 優先順位 | タスク名 | 推定時間 | 優先する理由 |
+|---------|---------|---------|------------|
+...
+
+最後に「今日中に必ず終わらせるべき3つ」をまとめてください。`
+  },
+  {
+    id: 'p3',
+    title: 'プロンプト③：MoSCoW法で分類',
+    desc: 'Must/Should/Could/Wontに整理',
+    template: `以下のTo-Doリストを「MoSCoW法」で分類してください。
+
+【タスク一覧】
+{TASKS}
+
+MoSCoW法の定義：
+- Must have：必ず今日やる（やらないと致命的）
+- Should have：できればやる（重要だが柔軟）
+- Could have：余裕があればやる
+- Won't have：今回はやらない
+
+各項目を分類し、理由も一言添えてください。`
+  },
+  {
+    id: 'p4',
+    title: 'プロンプト④：朝・昼・夜のスケジュール割り付け',
+    desc: '時間帯別に最適配置',
+    template: `以下のTo-Doを、1日のエネルギーリズムを考慮して時間帯に割り付けてください。
+
+【タスク一覧】
+{TASKS}
+
+条件：
+- 午前（9-12時）：集中力が高い → 思考系・創造系タスク
+- 午後（13-17時）：ミーティング・コミュニケーション向き
+- 夕方（17-19時）：ルーティン・事務処理向き
+
+出力形式：
+🌅 午前（9-12時）: ...
+☀️ 午後（13-17時）: ...
+🌇 夕方（17-19時）: ...
+📌 明日以降に回すもの: ...`
+  },
+  {
+    id: 'p5',
+    title: 'プロンプト⑤：2分ルール＋委任チェック',
+    desc: '即対応・委任・保留を分類',
+    template: `以下のTo-Doリストに「2分ルール」と「委任チェック」を適用してください。
+
+【タスク一覧】
+{TASKS}
+
+判定基準：
+1. 2分以内に終わる → 今すぐやる（2分タスク）
+2. 自分でなくてもよい → 委任する
+3. 締め切りがある → 期限付きタスクとして管理
+4. それ以外 → 時間を確保して集中して取り組む
+
+判定結果と「今すぐ着手する順番」を教えてください。`
+  }
+];
+
+let tasks = [
+  '週次レポートの提出（今日締め切り）',
+  '来週の会議スライド作成',
+  'メール返信（3通）',
+  '書類のファイリング',
+  '新機能の企画書を書く',
+  '健康診断の予約',
+  '勉強会の資料を読む',
+  '経費精算（今月末まで）'
+];
+
+let draggingTask = null;
+let activePromptId = 'p1';
+
+function renderTasks() {
+  const list = document.getElementById('taskList');
+  list.innerHTML = tasks.map((t, i) => `
+    <div class="task-item" draggable="true"
+         ondragstart="onTaskDragStart(event, ${i})"
+         ondragend="onTaskDragEnd(event)">
+      <span class="task-num">${i+1}</span>
+      <span class="task-text">${t}</span>
+      <button class="remove-btn" onclick="removeTask(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function renderPrompts() {
+  const list = document.getElementById('promptList');
+  list.innerHTML = PROMPTS.map(p => `
+    <div class="prompt-item ${p.id === activePromptId ? 'active' : ''}"
+         onclick="selectPrompt('${p.id}')">
+      <div class="prompt-title">${p.title}</div>
+      <div class="prompt-desc">${p.desc}</div>
+    </div>
+  `).join('');
+}
+
+function selectPrompt(id) {
+  activePromptId = id;
+  renderPrompts();
+  const p = PROMPTS.find(x => x.id === id);
+  const taskStr = tasks.map((t, i) => `${i+1}. ${t}`).join('\n');
+  const filled = p.template.replace('{TASKS}', taskStr);
+  document.getElementById('promptBox').textContent = filled;
+  document.getElementById('copyBtn').classList.remove('copied');
+  document.getElementById('copyBtn').textContent = '📋 クリップボードにコピー';
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptBox').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.classList.add('copied');
+    btn.textContent = '✅ コピーしました！';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.textContent = '📋 クリップボードにコピー';
+    }, 2000);
+  });
+}
+
+function addTask() {
+  const input = document.getElementById('taskInput');
+  const val = input.value.trim();
+  if (!val) return;
+  tasks.push(val);
+  input.value = '';
+  renderTasks();
+  selectPrompt(activePromptId);
+}
+
+function removeTask(i) {
+  tasks.splice(i, 1);
+  renderTasks();
+  selectPrompt(activePromptId);
+}
+
+// drag from task list to matrix
+function onTaskDragStart(e, idx) {
+  draggingTask = { type: 'from-list', idx };
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onTaskDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  draggingTask = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+  e.dataTransfer.dropEffect = 'move';
+}
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function onDrop(e, qId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!draggingTask) return;
+  const taskText = tasks[draggingTask.idx];
+  tasks.splice(draggingTask.idx, 1);
+  renderTasks();
+  selectPrompt(activePromptId);
+  addQTask(qId, taskText);
+}
+
+function addQTask(qId, text) {
+  const container = document.getElementById(`${qId}-tasks`);
+  const div = document.createElement('div');
+  div.className = 'q-task';
+  div.textContent = text;
+  container.appendChild(div);
+  // remove drop hint if exists
+  const hint = container.querySelector('.drop-hint');
+  if (hint) hint.remove();
+}
+
+document.getElementById('taskInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addTask();
+});
+
+// init
+renderTasks();
+renderPrompts();
+selectPrompt('p1');
+</script>
+</body>
+</html>
