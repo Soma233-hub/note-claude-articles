@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>Claude Code 開発ワークフロー インタラクティブデモ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 22px;
+    color: #79c0ff;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 24px;
+  }
+  .demo-container {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 1150px;
+  }
+  /* Sidebar */
+  .sidebar {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .sidebar h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b949e;
+    margin-bottom: 12px;
+  }
+  .cmd-group { margin-bottom: 16px; }
+  .cmd-group-label {
+    font-size: 11px;
+    color: #58a6ff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    padding-left: 4px;
+  }
+  .cmd-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .cmd-btn:hover {
+    background: #21262d;
+    border-color: #30363d;
+    color: #e6edf3;
+  }
+  .cmd-btn.active {
+    background: #0d2137;
+    border-color: #1f6feb;
+    color: #79c0ff;
+  }
+  .cmd-btn .cmd-name { color: #7ee787; display: block; font-weight: bold; }
+  .cmd-btn .cmd-desc { color: #8b949e; font-size: 11px; margin-top: 2px; font-family: system-ui; }
+
+  /* Terminal */
+  .main-panel { display: flex; flex-direction: column; gap: 14px; }
+  .terminal {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    overflow: hidden;
+    flex: 1;
+  }
+  .terminal-header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red { background: #ff5f57; }
+  .dot-yellow { background: #febc2e; }
+  .dot-green { background: #28c840; }
+  .terminal-title {
+    margin-left: 8px;
+    font-size: 12px;
+    color: #8b949e;
+    font-family: 'Courier New', monospace;
+  }
+  .terminal-body {
+    padding: 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    min-height: 320px;
+    max-height: 380px;
+    overflow-y: auto;
+    line-height: 1.7;
+  }
+  .line-prompt { color: #7ee787; }
+  .line-cmd { color: #e6edf3; }
+  .line-output { color: #8b949e; }
+  .line-info { color: #79c0ff; }
+  .line-success { color: #3fb950; }
+  .line-warning { color: #d29922; }
+  .line-error { color: #f85149; }
+  .line-claude { color: #d2a8ff; }
+  .line-highlight { color: #ffa657; }
+
+  /* Explainer card */
+  .explainer {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px 20px;
+  }
+  .explainer h3 {
+    font-size: 14px;
+    color: #79c0ff;
+    margin-bottom: 8px;
+  }
+  .explainer p {
+    font-size: 13px;
+    color: #8b949e;
+    line-height: 1.6;
+    margin-bottom: 8px;
+  }
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    font-size: 11px;
+    padding: 2px 10px;
+    color: #9ca3af;
+  }
+  .tag.level-high { background: #1a0a2e; border-color: #7c3aed; color: #a78bfa; }
+  .tag.usecase { background: #0a1f0a; border-color: #166534; color: #4ade80; }
+
+  /* Progress bar area */
+  .workflow-bar {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .wf-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    cursor: pointer;
+  }
+  .wf-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 55%;
+    right: -50%;
+    height: 2px;
+    background: #30363d;
+    z-index: 0;
+  }
+  .wf-step.done:not(:last-child)::after { background: #238636; }
+  .wf-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #21262d;
+    border: 2px solid #30363d;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    z-index: 1;
+    transition: all 0.2s;
+  }
+  .wf-step.done .wf-icon { background: #0f3d1f; border-color: #238636; }
+  .wf-step.active .wf-icon { background: #0d2137; border-color: #1f6feb; box-shadow: 0 0 8px #1f6feb80; }
+  .wf-label { font-size: 10px; color: #8b949e; margin-top: 5px; text-align: center; }
+  .wf-step.active .wf-label { color: #79c0ff; }
+  .wf-step.done .wf-label { color: #3fb950; }
+</style>
+</head>
+<body>
+<h1>🤖 Claude Code 開発ワークフロー インタラクティブデモ</h1>
+<p class="subtitle">コマンドを選んで、Claude Codeがどのように開発を加速するか体験してください</p>
+
+<div class="demo-container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>コマンド一覧</h2>
+
+    <div class="cmd-group">
+      <div class="cmd-group-label">⚡ 基本操作</div>
+      <button class="cmd-btn active" onclick="showCmd('start')" id="btn-start">
+        <span class="cmd-name">claude</span>
+        <span class="cmd-desc">対話モードを起動</span>
+      </button>
+      <button class="cmd-btn" onclick="showCmd('ask')" id="btn-ask">
+        <span class="cmd-name">claude -p "..."</span>
+        <span class="cmd-desc">ワンショット質問</span>
+      </button>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-label">🔧 コード生成</div>
+      <button class="cmd-btn" onclick="showCmd('generate')" id="btn-generate">
+        <span class="cmd-name">claude --print</span>
+        <span class="cmd-desc">コードを生成・出力</span>
+      </button>
+      <button class="cmd-btn" onclick="showCmd('refactor')" id="btn-refactor">
+        <span class="cmd-name">claude (リファクタ)</span>
+        <span class="cmd-desc">既存コードを改善</span>
+      </button>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-label">🧪 テスト・デバッグ</div>
+      <button class="cmd-btn" onclick="showCmd('test')" id="btn-test">
+        <span class="cmd-name">claude (テスト生成)</span>
+        <span class="cmd-desc">ユニットテストを自動作成</span>
+      </button>
+      <button class="cmd-btn" onclick="showCmd('debug')" id="btn-debug">
+        <span class="cmd-name">claude (デバッグ)</span>
+        <span class="cmd-desc">エラーを自動解析・修正</span>
+      </button>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-label">🚀 自動化</div>
+      <button class="cmd-btn" onclick="showCmd('pipeline')" id="btn-pipeline">
+        <span class="cmd-name">claude (パイプライン)</span>
+        <span class="cmd-desc">CI/CD連携・自動PR作成</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main panel -->
+  <div class="main-panel">
+    <!-- Workflow bar -->
+    <div class="workflow-bar" id="workflowBar">
+      <div class="wf-step done" id="ws1">
+        <div class="wf-icon">📝</div>
+        <div class="wf-label">起動</div>
+      </div>
+      <div class="wf-step" id="ws2">
+        <div class="wf-icon">⚡</div>
+        <div class="wf-label">生成</div>
+      </div>
+      <div class="wf-step" id="ws3">
+        <div class="wf-icon">🔍</div>
+        <div class="wf-label">解析</div>
+      </div>
+      <div class="wf-step" id="ws4">
+        <div class="wf-icon">🧪</div>
+        <div class="wf-label">テスト</div>
+      </div>
+      <div class="wf-step" id="ws5">
+        <div class="wf-icon">✅</div>
+        <div class="wf-label">完了</div>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+        <span class="terminal-title">bash — ~/myproject</span>
+      </div>
+      <div class="terminal-body" id="terminalBody">
+        <!-- content injected by JS -->
+      </div>
+    </div>
+
+    <!-- Explainer -->
+    <div class="explainer" id="explainerCard">
+      <h3 id="explainerTitle">Claude Code を起動する</h3>
+      <p id="explainerText">ターミナルで <code style="color:#7ee787">claude</code> と入力するだけで対話モードが起動します。プロジェクトのファイルを自動で認識し、コンテキストを把握した状態でやり取りを開始できます。</p>
+      <div class="tag-row">
+        <span class="tag level-high">上級編</span>
+        <span class="tag usecase">対話モード</span>
+        <span class="tag usecase">CLI</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const commands = {
+  start: {
+    title: 'Claude Code を起動する',
+    text: 'ターミナルで claude と入力するだけで対話モードが起動。プロジェクトのファイルを自動認識し、コンテキストを把握した状態でやり取りを開始できます。',
+    tags: ['対話モード', 'CLI', 'コンテキスト認識'],
+    workflow: [1],
+    lines: [
+      { cls: 'line-prompt', text: '$ claude' },
+      { cls: 'line-info', text: '  ✦ Claude Code v1.x.x' },
+      { cls: 'line-info', text: '  ✦ Project: myproject (Git: main)' },
+      { cls: 'line-info', text: '  ✦ Files indexed: 42 files' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  Claude: こんにちは！myproject の開発をお手伝いします。' },
+      { cls: 'line-claude', text: '  src/api/ と src/components/ を確認しました。' },
+      { cls: 'line-claude', text: '  何を実装しますか？' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-prompt', text: '  > ユーザー認証機能にJWTトークンを追加したい' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  Claude: src/auth/middleware.ts を確認しました。' },
+      { cls: 'line-claude', text: '  JWT実装のプランを提案します...' },
+    ]
+  },
+  ask: {
+    title: 'ワンショット質問 (-p オプション)',
+    text: '-p フラグでプロンプトを直接渡すと、対話を開始せずに即座に回答を返します。シェルスクリプトや CI/CD パイプラインへの組み込みに最適です。',
+    tags: ['ワンショット', 'シェル連携', 'スクリプト'],
+    workflow: [1, 2],
+    lines: [
+      { cls: 'line-prompt', text: '$ claude -p "この関数の計算量を教えて" < utils.py' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  Claude: 解析結果:' },
+      { cls: 'line-claude', text: '' },
+      { cls: 'line-highlight', text: '  bubble_sort(): O(n²) — 最悪・平均ケース' },
+      { cls: 'line-success', text: '  find_max():   O(n)  — 線形スキャン' },
+      { cls: 'line-warning', text: '  matrix_mul():  O(n³) — 要最適化' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  matrix_mul は numpy.matmul への置き換えを推奨します。' },
+      { cls: 'line-info', text: '  (BLAS最適化により 10〜100x 高速化可能)' },
+    ]
+  },
+  generate: {
+    title: 'コード生成 (--print オプション)',
+    text: '--print でコードのみを標準出力に返します。そのままファイルにリダイレクトしたり、他のコマンドにパイプしたりできます。ボイラープレートの自動生成に便利です。',
+    tags: ['コード生成', 'ファイル出力', 'ボイラープレート'],
+    workflow: [1, 2, 3],
+    lines: [
+      { cls: 'line-prompt', text: '$ claude --print "FastAPI の CRUD エンドポイント生成" > api.py' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-info', text: '  ⠋ Generating...' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-success', text: '  ✓ api.py に書き出し完了 (187 行)' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-prompt', text: '$ head -20 api.py' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-highlight', text: '  from fastapi import FastAPI, HTTPException' },
+      { cls: 'line-highlight', text: '  from pydantic import BaseModel' },
+      { cls: 'line-highlight', text: '  from typing import List, Optional' },
+      { cls: 'line-highlight', text: '' },
+      { cls: 'line-highlight', text: '  app = FastAPI(title="MyAPI", version="1.0.0")' },
+      { cls: 'line-highlight', text: '' },
+      { cls: 'line-highlight', text: '  @app.get("/items", response_model=List[Item])' },
+      { cls: 'line-highlight', text: '  async def get_items(skip: int = 0, limit: int = 100):' },
+    ]
+  },
+  refactor: {
+    title: 'リファクタリング支援',
+    text: '既存のコードファイルをコンテキストに含めながら「読みやすくして」「型を付けて」などの自然言語指示でリファクタリングを実行。差分をレビューしてから適用できます。',
+    tags: ['リファクタリング', '型付け', 'コードレビュー'],
+    workflow: [1, 2, 3],
+    lines: [
+      { cls: 'line-prompt', text: '$ claude' },
+      { cls: 'line-prompt', text: '  > src/utils.js を TypeScript に移行して型を追加して' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-info', text: '  ⠋ src/utils.js を解析中... (156 行)' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  Claude: 変更内容:' },
+      { cls: 'line-success', text: '  + interface UserData { id: number; name: string; email: string }' },
+      { cls: 'line-success', text: '  + function formatUser(user: UserData): string {' },
+      { cls: 'line-error', text: '  - function formatUser(user) {' },
+      { cls: 'line-warning', text: '' },
+      { cls: 'line-claude', text: '  any 型を 12 箇所から具体的な型に変換しました。' },
+      { cls: 'line-claude', text: '  適用しますか？ [y/N]' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-prompt', text: '  > y' },
+      { cls: 'line-success', text: '  ✓ src/utils.ts として保存しました' },
+    ]
+  },
+  test: {
+    title: 'ユニットテスト自動生成',
+    text: '実装ファイルを渡すだけで、エッジケースを含む包括的なユニットテストを自動生成します。テストフレームワーク（Jest / pytest / Go test）を自動検出して適切なコードを出力します。',
+    tags: ['テスト自動生成', 'Jest', 'pytest', 'エッジケース'],
+    workflow: [1, 2, 3, 4],
+    lines: [
+      { cls: 'line-prompt', text: '$ claude -p "src/auth.py のテストを生成" > tests/test_auth.py' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-info', text: '  ⠋ src/auth.py を解析中... pytest を検出' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-success', text: '  ✓ tests/test_auth.py 生成完了 (8 テストケース)' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-prompt', text: '$ pytest tests/test_auth.py -v' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-success', text: '  PASSED test_login_success' },
+      { cls: 'line-success', text: '  PASSED test_login_invalid_password' },
+      { cls: 'line-success', text: '  PASSED test_token_expiry' },
+      { cls: 'line-success', text: '  PASSED test_refresh_token' },
+      { cls: 'line-warning', text: '  FAILED test_concurrent_sessions  ← エッジケース発見！' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-info', text: '  8 tests: 7 passed, 1 failed in 0.43s' },
+    ]
+  },
+  debug: {
+    title: 'エラー自動解析・修正',
+    text: 'スタックトレースをそのままペーストするか、エラー出力をパイプするだけで原因を特定し修正案を提示します。再現ステップの提案まで行うため、デバッグ時間を大幅短縮できます。',
+    tags: ['デバッグ', 'エラー解析', 'スタックトレース'],
+    workflow: [1, 3, 4],
+    lines: [
+      { cls: 'line-prompt', text: '$ pytest 2>&1 | claude -p "このエラーを直して"' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-error', text: '  入力: TypeError: unsupported operand type(s)' },
+      { cls: 'line-error', text: '         for +: \'str\' and \'int\' (line 42)' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  Claude: 原因特定:' },
+      { cls: 'line-claude', text: '  src/calculator.py:42 で price が str 型のまま演算されています。' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  修正案:' },
+      { cls: 'line-error', text: '  -  total = price + tax' },
+      { cls: 'line-success', text: '  +  total = float(price) + tax' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-claude', text: '  入力バリデーションも追加することを推奨します。' },
+      { cls: 'line-claude', text: '  src/calculator.py を直接修正しますか？ [y/N]' },
+    ]
+  },
+  pipeline: {
+    title: 'CI/CD パイプライン連携',
+    text: 'GitHub Actions と組み合わせて、PR作成時に自動でコードレビュー・テスト生成・ドキュメント更新を実行するパイプラインを構築できます。人手を介さない完全自動化ワークフローの実現例です。',
+    tags: ['GitHub Actions', 'CI/CD', '完全自動化', 'PR自動作成'],
+    workflow: [1, 2, 3, 4, 5],
+    lines: [
+      { cls: 'line-prompt', text: '# .github/workflows/claude-review.yml' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-highlight', text: '  on: [pull_request]' },
+      { cls: 'line-highlight', text: '  steps:' },
+      { cls: 'line-highlight', text: '    - uses: anthropics/claude-code-action@v1' },
+      { cls: 'line-highlight', text: '      with:' },
+      { cls: 'line-highlight', text: '        prompt: |' },
+      { cls: 'line-highlight', text: '          差分を確認してコードレビューを実施し' },
+      { cls: 'line-highlight', text: '          不足テストを自動追加してください' },
+      { cls: 'line-output', text: '' },
+      { cls: 'line-info', text: '  [PR #42 opened] ─ Workflow triggered' },
+      { cls: 'line-success', text: '  ✓ Code Review: 3 suggestions posted' },
+      { cls: 'line-success', text: '  ✓ Tests added: 5 new test cases' },
+      { cls: 'line-success', text: '  ✓ Coverage: 73% → 89%' },
+      { cls: 'line-success', text: '  ✓ All checks passed — Ready to merge' },
+    ]
+  }
+};
+
+function showCmd(key) {
+  const cmd = commands[key];
+  // Update active button
+  document.querySelectorAll('.cmd-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + key).classList.add('active');
+
+  // Render terminal
+  const body = document.getElementById('terminalBody');
+  body.innerHTML = cmd.lines.map(l =>
+    `<div class="${l.cls}">${escapeHtml(l.text)}</div>`
+  ).join('');
+
+  // Update explainer
+  document.getElementById('explainerTitle').textContent = cmd.title;
+  document.getElementById('explainerText').textContent = cmd.text;
+  const tagRow = document.querySelector('.tag-row');
+  tagRow.innerHTML = '<span class="tag level-high">上級編</span>' +
+    cmd.tags.map(t => `<span class="tag usecase">${t}</span>`).join('');
+
+  // Update workflow bar
+  ['ws1','ws2','ws3','ws4','ws5'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.className = 'wf-step';
+    if (cmd.workflow.includes(i + 1)) el.classList.add('done');
+  });
+
+  // Scroll terminal to bottom
+  body.scrollTop = body.scrollHeight;
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+showCmd('start');
+</script>
+</body>
+</html>
