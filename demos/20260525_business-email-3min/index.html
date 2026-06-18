@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200">
+  <title>Claudeビジネスメール作成デモ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%);
+      min-height: 800px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: #6b7280;
+      font-size: 15px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #8b5cf6, #ec4899);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .main-container {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      width: 100%;
+      max-width: 1140px;
+    }
+
+    /* Scenario Selector */
+    .scenario-panel {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      border: 1px solid #e5e7eb;
+      height: fit-content;
+    }
+
+    .scenario-panel h2 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    .scenario-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 6px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      background: #f9fafb;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .scenario-btn:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+
+    .scenario-btn.active {
+      background: linear-gradient(135deg, #ede9fe, #fce7f3);
+      border-color: #a78bfa;
+    }
+
+    .scenario-btn .icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .scenario-btn .label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      line-height: 1.3;
+    }
+
+    .scenario-btn.active .label {
+      color: #7c3aed;
+    }
+
+    /* Main Editor Area */
+    .editor-area {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .panel-header h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .tag-prompt { background: #dbeafe; color: #1d4ed8; }
+    .tag-output { background: #d1fae5; color: #065f46; }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .prompt-text {
+      font-size: 13px;
+      line-height: 1.8;
+      color: #374151;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .output-text {
+      font-size: 13px;
+      line-height: 1.9;
+      color: #1f2937;
+      white-space: pre-wrap;
+    }
+
+    /* Generate Button */
+    .generate-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 12px 0;
+    }
+
+    .arrow-icon {
+      font-size: 24px;
+      animation: bounce 1.5s infinite;
+      color: #8b5cf6;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .gen-btn {
+      background: linear-gradient(135deg, #8b5cf6, #ec4899);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 50px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+      font-family: inherit;
+    }
+
+    .gen-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+    }
+
+    .gen-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Timer */
+    .timer-bar {
+      background: white;
+      border-radius: 16px;
+      padding: 16px 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      border: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .timer-label {
+      font-size: 13px;
+      color: #6b7280;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .timer-progress {
+      flex: 1;
+      height: 6px;
+      background: #f3f4f6;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .timer-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #8b5cf6, #ec4899);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .timer-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #7c3aed;
+      min-width: 50px;
+      text-align: right;
+    }
+
+    .tips-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .tip-card {
+      background: white;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border: 1px solid #e5e7eb;
+    }
+
+    .tip-card .tip-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: #a78bfa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .tip-card .tip-text {
+      font-size: 12px;
+      color: #374151;
+      line-height: 1.6;
+    }
+
+    .loading-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">✨ CLAUDE DEMO</div>
+  <h1>📧 ビジネスメール 3分作成デモ</h1>
+  <p>シーンを選んでプロンプトを確認 → Claudeが瞬時に完成メールを生成</p>
+</header>
+
+<div class="main-container">
+
+  <!-- Scenario Panel -->
+  <div class="scenario-panel">
+    <h2>📋 シーンを選ぶ</h2>
+    <button class="scenario-btn active" onclick="selectScenario(0)" id="btn-0">
+      <span class="icon">🤝</span>
+      <span class="label">取引先への<br>お礼メール</span>
+    </button>
+    <button class="scenario-btn" onclick="selectScenario(1)" id="btn-1">
+      <span class="icon">📅</span>
+      <span class="label">会議日程の<br>調整依頼</span>
+    </button>
+    <button class="scenario-btn" onclick="selectScenario(2)" id="btn-2">
+      <span class="icon">⚠️</span>
+      <span class="label">遅延・トラブルの<br>謝罪メール</span>
+    </button>
+    <button class="scenario-btn" onclick="selectScenario(3)" id="btn-3">
+      <span class="icon">📊</span>
+      <span class="label">提案・見積もりの<br>送付メール</span>
+    </button>
+    <button class="scenario-btn" onclick="selectScenario(4)" id="btn-4">
+      <span class="icon">🔄</span>
+      <span class="label">フォローアップ<br>リマインダー</span>
+    </button>
+    <button class="scenario-btn" onclick="selectScenario(5)" id="btn-5">
+      <span class="icon">👋</span>
+      <span class="label">初回ご挨拶<br>メール</span>
+    </button>
+  </div>
+
+  <!-- Editor Area -->
+  <div class="editor-area">
+
+    <!-- Timer Bar -->
+    <div class="timer-bar">
+      <span class="timer-label">⏱ 作成時間</span>
+      <div class="timer-progress">
+        <div class="timer-fill" id="timerFill"></div>
+      </div>
+      <span class="timer-value" id="timerValue">0.0s</span>
+      <span style="font-size:13px;color:#6b7280;">（目標: 3分以内）</span>
+    </div>
+
+    <!-- Prompt + Output -->
+    <div class="editor-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>💡 使用プロンプト</h3>
+          <span class="panel-tag tag-prompt">INPUT</span>
+        </div>
+        <div class="panel-body">
+          <div class="prompt-text" id="promptDisplay"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3>📨 生成されたメール</h3>
+          <span class="panel-tag tag-output">OUTPUT</span>
+        </div>
+        <div class="panel-body">
+          <div class="output-text" id="outputDisplay">← シーンを選んで「生成」ボタンを押してください</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate Button -->
+    <div class="generate-section">
+      <span class="arrow-icon">⚡</span>
+      <button class="gen-btn" onclick="generateEmail()">
+        🤖 Claudeで生成する
+      </button>
+      <span class="arrow-icon">⚡</span>
+    </div>
+
+    <!-- Tips -->
+    <div class="tips-row">
+      <div class="tip-card">
+        <div class="tip-num">💡 Tip 1</div>
+        <div class="tip-text">「丁寧に」「簡潔に」など<b>トーン指定</b>をプロンプトに加えると文体が変わる</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-num">💡 Tip 2</div>
+        <div class="tip-text">社名・担当者名・件名の<b>具体情報を埋める</b>ほど精度が上がる</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-num">💡 Tip 3</div>
+        <div class="tip-text">「修正して」と追加指示するだけで<b>何度でも微調整</b>できる</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const scenarios = [
+  {
+    name: "取引先へのお礼メール",
+    prompt: `以下の条件でお礼メールを作成してください。
+
+【宛先】株式会社〇〇 田中様
+【状況】先日の打ち合わせで丁寧なご説明をいただいた
+【ポイント】
+・感謝の気持ちを具体的に伝える
+・次のステップ（資料送付）に言及する
+・簡潔で読みやすい文章（200字以内）
+
+形式：件名＋本文`,
+    output: `件名：先日の打ち合わせのお礼
+
+田中様
+
+いつもお世話になっております。
+株式会社△△の山田でございます。
+
+先日は貴重なお時間をいただき、
+誠にありがとうございました。
+ご丁寧なご説明のおかげで、
+製品への理解が深まりました。
+
+早速、ご提案いただいた内容を
+社内で共有いたします。
+改めてご連絡させていただきますので、
+引き続きどうぞよろしくお願いいたします。
+
+山田 太郎`
+  },
+  {
+    name: "会議日程の調整依頼",
+    prompt: `会議日程調整のメールを作成してください。
+
+【宛先】プロジェクトチーム関係者
+【状況】月次定例会議の日程を調整したい
+【希望日】6月3日(火)・6月5日(木)・6月7日(土)
+【時間帯】午後2時〜4時のいずれか
+【場所】オンライン（ZoomURL後日送付）
+【締切】5月28日(木)までに回答希望`,
+    output: `件名：【確認依頼】6月度月次定例会議の日程調整
+
+関係者各位
+
+お疲れ様です。山田です。
+
+6月度の月次定例会議について、
+下記候補日のご都合をご確認ください。
+
+■ 候補日時（いずれも14:00〜16:00）
+  ① 6月3日（火）
+  ② 6月5日（木）
+  ③ 6月7日（土）
+
+※ 開催形式：オンライン（Zoom）
+  URLは確定後にお送りします。
+
+ご多忙のところ恐れ入りますが、
+5月28日（木）までにご回答いただけますと幸いです。
+
+どうぞよろしくお願いいたします。
+山田 太郎`
+  },
+  {
+    name: "遅延・トラブルの謝罪メール",
+    prompt: `トラブル謝罪メールを作成してください。
+
+【宛先】株式会社〇〇 佐藤部長
+【状況】システム障害により納品が2日遅延した
+【対応】原因究明済み・再発防止策を実施
+【トーン】誠実で真摯な謝罪。言い訳はしない
+【要素】お詫び・原因・対応策・今後の約束`,
+    output: `件名：【お詫び】システム障害による納品遅延について
+
+佐藤部長 様
+
+平素より大変お世話になっております。
+株式会社△△の山田でございます。
+
+このたびは、システム障害に伴い
+ご納品が2日間遅延しましたことを
+深くお詫び申し上げます。
+
+【原因】サーバー設定の不備
+【対応】原因を特定し、設定を修正済みです。
+     再発防止のため監視体制も強化いたしました。
+
+ご迷惑・ご不便をおかけしましたこと、
+誠に申し訳ございませんでした。
+再発防止に全力で取り組んでまいります。
+
+引き続きご指導のほどよろしくお願いいたします。
+山田 太郎`
+  },
+  {
+    name: "提案・見積もりの送付メール",
+    prompt: `提案書送付メールを作成してください。
+
+【宛先】株式会社〇〇 鈴木様
+【状況】先日の商談を受けて提案書を送付
+【添付】提案書PDF・見積書Excel（2点）
+【ポイント】
+・提案の要点を2〜3行で説明
+・質問があれば気軽に連絡を促す
+・次のアクション（打ち合わせ）を提案`,
+    output: `件名：【ご提案】業務効率化ソリューションのご提案書送付
+
+鈴木様
+
+先日はお時間をいただき、ありがとうございました。
+
+ご要望をふまえ、提案書および見積書を
+添付にてお送りいたします。
+
+■ 添付書類
+  ① 業務効率化ソリューション提案書.pdf
+  ② お見積書_202605.xlsx
+
+本提案では、現在の課題である
+「作業工数の削減」と「データ管理の一元化」を
+重点的にご支援できる内容となっております。
+
+ご確認いただいた後、ご質問や修正のご要望が
+ございましたらお気軽にご連絡ください。
+来週以降で改めてご説明の機会をいただけますと幸いです。
+
+どうぞよろしくお願いいたします。
+山田 太郎`
+  },
+  {
+    name: "フォローアップリマインダー",
+    prompt: `フォローアップメールを作成してください。
+
+【状況】1週間前に送った提案書への返答がない
+【宛先】高橋様（顧客）
+【トーン】しつこく感じさせず、自然にリマインド
+【追加要素】返答しやすいよう「YesかNoかだけでOK」と伝える`,
+    output: `件名：Re: 【ご提案】業務効率化ソリューションのご提案書送付
+
+高橋様
+
+お世話になっております。山田です。
+
+先日ご送付した提案書について、
+ご確認いただけましたでしょうか？
+
+ご多忙のところ恐縮ですが、
+ご検討の方向性だけでも教えていただけますと幸いです。
+「進める方向」「再検討が必要」「今回は見送り」
+のいずれかをお知らせいただくだけで構いません。
+
+もしご不明点等ございましたら、
+いつでもお気軽にご連絡ください。
+
+引き続きどうぞよろしくお願いいたします。
+山田 太郎`
+  },
+  {
+    name: "初回ご挨拶メール",
+    prompt: `初回ご挨拶メールを作成してください。
+
+【状況】部署異動で新しい担当者になった
+【宛先】既存取引先の担当者
+【伝える内容】
+・前任者からの引き継ぎ
+・自己紹介（名前・前部署）
+・今後のサポートへの意欲
+・近日中に伺いたい旨`,
+    output: `件名：【ご挨拶】担当者変更のご連絡
+
+お世話になっております。
+
+このたび、〇〇部より異動してまいりました
+山田 太郎と申します。
+
+前任の鈴木に代わり、
+貴社をご担当させていただくことになりました。
+突然のご連絡となり、誠に恐れ入ります。
+
+鈴木より業務の引き継ぎを受けており、
+これまでのご関係を大切にしながら
+よりよいサポートができるよう努めてまいります。
+
+近日中に改めてご挨拶に伺えればと思っております。
+ご都合のよい日程をお知らせいただけますと幸いです。
+
+どうぞよろしくお願いいたします。
+
+山田 太郎（Taro Yamada）
+株式会社△△ 営業部
+Tel: 03-XXXX-XXXX
+Mail: yamada@example.com`
+  }
+];
+
+let currentScenario = 0;
+let timerInterval = null;
+let startTime = null;
+
+function selectScenario(idx) {
+  document.querySelectorAll('.scenario-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === idx);
+  });
+  currentScenario = idx;
+  document.getElementById('promptDisplay').textContent = scenarios[idx].prompt;
+  document.getElementById('outputDisplay').textContent = '← 「Claudeで生成する」ボタンを押してください';
+  resetTimer();
+}
+
+function resetTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  document.getElementById('timerFill').style.width = '0%';
+  document.getElementById('timerValue').textContent = '0.0s';
+}
+
+function generateEmail() {
+  const output = document.getElementById('outputDisplay');
+  output.textContent = 'Claudeが生成中';
+  output.classList.add('loading-dots');
+  resetTimer();
+
+  startTime = Date.now();
+  const targetTime = 1500 + Math.random() * 1000; // 1.5〜2.5秒
+
+  timerInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / targetTime * 100, 100);
+    const seconds = (elapsed / 1000).toFixed(1);
+    document.getElementById('timerFill').style.width = progress + '%';
+    document.getElementById('timerValue').textContent = seconds + 's';
+
+    if (elapsed >= targetTime) {
+      clearInterval(timerInterval);
+      output.classList.remove('loading-dots');
+      output.textContent = scenarios[currentScenario].output;
+
+      const finalTime = (targetTime / 1000).toFixed(1);
+      document.getElementById('timerValue').textContent = finalTime + 's ✅';
+    }
+  }, 50);
+}
+
+// Initialize
+selectScenario(0);
+</script>
+</body>
+</html>
